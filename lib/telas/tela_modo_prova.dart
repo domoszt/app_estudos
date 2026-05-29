@@ -1,4 +1,3 @@
-// lib/telas/tela_modo_prova.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
@@ -6,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../modelos/sessao_estudo.dart';
+import 'package:vibration/vibration.dart';
 
 class TelaModoProva extends StatefulWidget {
   const TelaModoProva({super.key});
@@ -55,10 +55,13 @@ class _TelaModoProvaState extends State<TelaModoProva> {
     
     if (tempoEsgotado) {
       setState(() { _tempoRestanteSegundos = 0; });
-      // Vibração dupla e forte para simular o fiscal a dizer "Parem de escrever!"
-      HapticFeedback.heavyImpact();
-      await Future.delayed(const Duration(milliseconds: 300));
-      HapticFeedback.heavyImpact();
+      
+      // O ALARME VIBRATÓRIO DEFINITIVO
+      bool? temVibrador = await Vibration.hasVibrator();
+      if (temVibrador == true) {
+        // Padrão: [espera, vibra, espera, vibra, espera, vibra] em milissegundos
+        Vibration.vibrate(pattern: [0, 1000, 500, 1000, 500, 1000]); 
+      }
     }
 
     if (mounted) {
@@ -110,14 +113,13 @@ class _TelaModoProvaState extends State<TelaModoProva> {
     final acertosController = TextEditingController();
     final obsController = TextEditingController();
     
-    // Calcula o tempo que realmente usou!
     int tempoUsado = _tempoTotalSegundos - _tempoRestanteSegundos;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      isDismissible: false, // Impede que o utilizador feche sem querer
-      enableDrag: false, // Impede de arrastar para baixo
+      isDismissible: false, 
+      enableDrag: false, 
       backgroundColor: const Color(0xFF1C1C1C),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (BuildContext context) {
@@ -126,7 +128,7 @@ class _TelaModoProvaState extends State<TelaModoProva> {
             bottom: MediaQuery.of(context).viewInsets.bottom,
             left: 24,
             right: 24,
-            top: 32, // Mais espaço no topo
+            top: 32, 
           ),
           child: SingleChildScrollView(
             child: Form(
@@ -202,7 +204,7 @@ class _TelaModoProvaState extends State<TelaModoProva> {
                         final novaSessao = SessaoEstudo(
                           materia: materiaController.text,
                           assunto: assuntoController.text,
-                          tipoEstudo: 'Simulado', // Fixo como Simulado!
+                          tipoEstudo: 'Simulado', 
                           observacoes: obsController.text,
                           duracaoSegundos: tempoUsado,
                           data: DateTime.now(),
@@ -216,8 +218,8 @@ class _TelaModoProvaState extends State<TelaModoProva> {
                         await prefs.setStringList('sessoes_estudo', sessoesSalvas);
 
                         if (context.mounted) {
-                          Navigator.pop(context); // Fecha o modal
-                          Navigator.pop(context); // Sai do Modo Prova e volta à base
+                          Navigator.pop(context); 
+                          Navigator.pop(context); 
                         }
                       }
                     },
@@ -232,8 +234,8 @@ class _TelaModoProvaState extends State<TelaModoProva> {
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {
-                      Navigator.pop(context); // Fecha o modal
-                      Navigator.pop(context); // Sai do Modo Prova
+                      Navigator.pop(context); 
+                      Navigator.pop(context); 
                     },
                     child: const Text('Descartar Registo', style: TextStyle(color: Colors.redAccent)),
                   ),
@@ -267,7 +269,7 @@ class _TelaModoProvaState extends State<TelaModoProva> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F), // Fundo ainda mais escuro para foco
+      backgroundColor: const Color(0xFF0F0F0F),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -356,7 +358,7 @@ class _TelaModoProvaState extends State<TelaModoProva> {
           child: DropdownButton<int>(
             value: valorAtual,
             dropdownColor: const Color(0xFF2D2D2D),
-            underline: const SizedBox(), // Remove a linha
+            underline: const SizedBox(), 
             icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
             style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, fontFeatures: [FontFeature.tabularFigures()]),
             items: List.generate(max + 1, (index) {
@@ -377,7 +379,6 @@ class _TelaModoProvaState extends State<TelaModoProva> {
   Widget _construirTelaGuerra() {
     double progresso = _tempoTotalSegundos > 0 ? (_tempoRestanteSegundos / _tempoTotalSegundos) : 0;
     
-    // Muda para vermelho se faltarem menos de 15 minutos (900 segs) ou menos de 10% do tempo
     bool isCritico = _tempoRestanteSegundos <= 900 || progresso < 0.10;
     Color corAnel = isCritico ? const Color(0xFFE57373) : const Color(0xFF4DA6FF);
 
@@ -385,7 +386,6 @@ class _TelaModoProvaState extends State<TelaModoProva> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Spacer(),
-        // O Anel de Progresso Gigante
         Center(
           child: Stack(
             alignment: Alignment.center,
@@ -395,10 +395,10 @@ class _TelaModoProvaState extends State<TelaModoProva> {
                 height: 280,
                 child: CircularProgressIndicator(
                   value: progresso,
-                  strokeWidth: 16, // Espessura grossa estilo gamer
+                  strokeWidth: 16, 
                   backgroundColor: const Color(0xFF1C1C1C),
                   valueColor: AlwaysStoppedAnimation<Color>(corAnel),
-                  strokeCap: StrokeCap.round, // Pontas arredondadas
+                  strokeCap: StrokeCap.round, 
                 ),
               ),
               Column(
@@ -429,10 +429,10 @@ class _TelaModoProvaState extends State<TelaModoProva> {
             label: const Text('Entregar Prova', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             style: TextButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 20),
-              foregroundColor: const Color(0xFF81C784), // Verde
+              foregroundColor: const Color(0xFF81C784), 
               backgroundColor: const Color(0xFF81C784).withValues(alpha: 0.1),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              minimumSize: const Size(double.infinity, 0), // Preenche a largura
+              minimumSize: const Size(double.infinity, 0), 
             ),
           ),
         ),

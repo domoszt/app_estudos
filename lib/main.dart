@@ -1,25 +1,31 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // <-- Biblioteca que permite controlar a tela
 import 'telas/tela_base.dart';
 
 void main() {
-  runApp(const MeuAppEstudos());
+  // Garante que o motor do Flutter está pronto antes de dar ordens ao sistema
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Trava o aplicativo EXCLUSIVAMENTE na vertical (Retrato)
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]).then((_) {
+    runApp(const MeuApp());
+  });
 }
 
-class MeuAppEstudos extends StatelessWidget {
-  const MeuAppEstudos({super.key});
+class MeuApp extends StatelessWidget {
+  const MeuApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Controle de Estudos',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
+      title: 'App de Estudos',
+      theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F0F0F),
-        primaryColor: const Color(0xFF4DA6FF),
       ),
       home: const TelaBase(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
