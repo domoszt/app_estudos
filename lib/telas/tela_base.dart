@@ -276,6 +276,9 @@ class _TelaBaseState extends State<TelaBase> {
         backgroundColor: const Color(0xFF1C1C1C),
         child: Column(
           children: [
+            // =================================================================
+            // REBRANDING: DRAWER HEADER COM LOGO E NOME "VANGUARD"
+            // =================================================================
             DrawerHeader(
               decoration: const BoxDecoration(
                 color: Color(0xFF2D2D2D),
@@ -287,17 +290,27 @@ class _TelaBaseState extends State<TelaBase> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4DA6FF).withValues(alpha: 0.2),
+                        color: const Color(0xFF4DA6FF).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.rocket_launch_rounded, color: Color(0xFF4DA6FF), size: 32),
+                      child: Image.asset(
+                        'assets/icones/icone.png',
+                        width: 42,
+                        height: 42,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Menu Tático',
-                      style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                      'Vanguard',
+                      style: TextStyle(
+                        color: Colors.white, 
+                        fontSize: 24, 
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ],
                 ),
@@ -424,9 +437,6 @@ class _TelaBaseState extends State<TelaBase> {
   }
 }
 
-// =============================================================================
-// O WIDGET ISOLADO PARA ADICIONAR SESSÃO MANUAL
-// =============================================================================
 class _PainelAdicionarManual extends StatefulWidget {
   final List<String> listaMaterias;
   final List<String> listaAssuntos;
@@ -631,7 +641,6 @@ class _PainelAdicionarManualState extends State<_PainelAdicionarManual> {
                 onChanged: (String? novoValor) {
                   setState(() {
                     _modoTempo = novoValor!;
-                    // REGRA DE UX: Se for sem tempo, tranca o tipo em Questões
                     if (_modoTempo == 'Sem tempo (Só questões)') {
                       _tipoSelecionado = 'Questões';
                     }
@@ -880,11 +889,9 @@ class _PainelAdicionarManualState extends State<_PainelAdicionarManual> {
                 items: _tiposDeEstudo.map((String tipo) {
                   return DropdownMenuItem<String>(
                     value: tipo, 
-                    // Se o dropdown for bloqueado, ele fica acinzentado automaticamente pelo Flutter, mas garantimos o estilo
                     child: Text(tipo, style: const TextStyle(color: Colors.white))
                   );
                 }).toList(),
-                // REGRA DE UX: Desativa (bloqueia) a alteração do Dropdown passando null para o onChanged
                 onChanged: _modoTempo == 'Sem tempo (Só questões)' ? null : (String? novoValor) {
                   setState(() {
                     _tipoSelecionado = novoValor;
