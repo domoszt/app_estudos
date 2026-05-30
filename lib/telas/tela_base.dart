@@ -21,14 +21,6 @@ class _TelaBaseState extends State<TelaBase> {
   
   Key _chaveAbas = UniqueKey();
 
-  final List<String> _tiposDeEstudo = [
-    'Teoria',
-    'Questões',
-    'Teoria e Questões',
-    'Prática de Redação',
-    'Simulado'
-  ];
-
   void _atualizarDados() {
     setState(() {
       _chaveAbas = UniqueKey();
@@ -170,8 +162,9 @@ class _TelaBaseState extends State<TelaBase> {
         ],
       ),
     ).whenComplete(() {
-      // CODE REVIEW: Limpeza de memória garantida ao fechar o pop-up
-      codigoController.dispose();
+      Future.delayed(const Duration(milliseconds: 300), () {
+        codigoController.dispose();
+      });
     });
   }
 
@@ -228,7 +221,7 @@ class _TelaBaseState extends State<TelaBase> {
   }
 
   // ===========================================================================
-  // ADICIONAR MANUALMENTE
+  // ADICIONAR MANUALMENTE (ABERTURA DO PAINEL)
   // ===========================================================================
   void _abrirPainelAdicionarManual() async {
     final prefs = await SharedPreferences.getInstance();
@@ -252,455 +245,19 @@ class _TelaBaseState extends State<TelaBase> {
 
     if (!mounted) return;
 
-    final formKey = GlobalKey<FormState>();
-    
-    final materiaController = TextEditingController();
-    final assuntoController = TextEditingController();
-    final obsController = TextEditingController();
-    final totalQuestoesController = TextEditingController();
-    final acertosController = TextEditingController();
-    final horasController = TextEditingController();
-    final minutosController = TextEditingController();
-    
-    String? tipoSelecionado;
-    String modoTempo = 'Duração Total'; 
-    DateTime dataEscolhida = DateTime.now();
-    TimeOfDay? horaInicio;
-    TimeOfDay? horaFim;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF1C1C1C),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            
-            bool mostrarCamposDeQuestao = tipoSelecionado == 'Questões' || tipoSelecionado == 'Teoria e Questões' || tipoSelecionado == 'Simulado';
-
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
-              ),
-              child: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'Adicionar Sessão Manual',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                      const SizedBox(height: 24),
-
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.calendar_month_rounded, color: Color(0xFF4DA6FF)),
-                        title: const Text('Data do Estudo', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                        subtitle: Text(
-                          "${dataEscolhida.day.toString().padLeft(2, '0')}/${dataEscolhida.month.toString().padLeft(2, '0')}/${dataEscolhida.year}",
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                        trailing: TextButton(
-                          onPressed: () async {
-                            final DateTime? escolhida = await showDatePicker(
-                              context: context,
-                              initialDate: dataEscolhida,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now(),
-                              builder: (context, child) {
-                                return Theme(
-                                  data: ThemeData.dark().copyWith(
-                                    colorScheme: const ColorScheme.dark(
-                                      primary: Color(0xFF4DA6FF),
-                                      surface: Color(0xFF2D2D2D),
-                                    ),
-                                  ),
-                                  child: child!,
-                                );
-                              },
-                            );
-                            if (escolhida != null) {
-                              setModalState(() => dataEscolhida = escolhida);
-                            }
-                          },
-                          child: const Text('Alterar', style: TextStyle(color: Color(0xFF4DA6FF))),
-                        ),
-                      ),
-                      Divider(color: Colors.grey.shade800),
-                      const SizedBox(height: 16),
-
-                      const Text('Método de Tempo', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: modoTempo,
-                        dropdownColor: const Color(0xFF2D2D2D),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: const Color(0xFF0F0F0F),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        ),
-                        items: ['Duração Total', 'Início e Fim', 'Sem tempo (Só questões)'].map((String modo) {
-                          return DropdownMenuItem<String>(
-                            value: modo,
-                            child: Text(modo, style: const TextStyle(color: Colors.white)),
-                          );
-                        }).toList(),
-                        onChanged: (String? novoValor) {
-                          setModalState(() {
-                            modoTempo = novoValor!;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      if (modoTempo == 'Duração Total')
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: horasController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(labelText: 'Horas', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: TextFormField(
-                                controller: minutosController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(labelText: 'Minutos', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        )
-                      else if (modoTempo == 'Início e Fim')
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  final TimeOfDay? time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-                                  if (time != null) setModalState(() => horaInicio = time);
-                                },
-                                icon: const Icon(Icons.access_time),
-                                label: Text(horaInicio == null ? 'Início' : horaInicio!.format(context)),
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F0F0F), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  final TimeOfDay? time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-                                  if (time != null) setModalState(() => horaFim = time);
-                                },
-                                icon: const Icon(Icons.access_time_filled),
-                                label: Text(horaFim == null ? 'Fim' : horaFim!.format(context)),
-                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F0F0F), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                      const SizedBox(height: 24),
-                      Divider(color: Colors.grey.shade800),
-                      const SizedBox(height: 16),
-
-                      Autocomplete<String>(
-                        optionsBuilder: (TextEditingValue textEditingValue) {
-                          if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
-                          return listaMaterias.where((String option) {
-                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                          });
-                        },
-                        onSelected: (String selection) {
-                          materiaController.text = selection; 
-                        },
-                        fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
-                          fieldController.addListener(() {
-                            materiaController.text = fieldController.text;
-                          });
-
-                          return TextFormField(
-                            controller: fieldController,
-                            focusNode: fieldFocusNode,
-                            validator: (value) => (value == null || value.trim().isEmpty) ? 'Obrigatório' : null,
-                            decoration: InputDecoration(
-                              labelText: 'Matéria *',
-                              hintText: 'Ex: Matemática',
-                              hintStyle: TextStyle(color: Colors.grey.shade700),
-                              labelStyle: TextStyle(color: Colors.grey.shade500),
-                              filled: true,
-                              fillColor: const Color(0xFF0F0F0F),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
-                            ),
-                            style: const TextStyle(color: Colors.white),
-                          );
-                        },
-                        optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
-                          return Align(
-                            alignment: Alignment.topLeft,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: Container(
-                                width: MediaQuery.of(context).size.width - 48, 
-                                margin: const EdgeInsets.only(top: 8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2D2D2D),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.grey.shade800),
-                                ),
-                                child: ListView.builder(
-                                  padding: EdgeInsets.zero,
-                                  shrinkWrap: true,
-                                  itemCount: options.length,
-                                  itemBuilder: (BuildContext context, int index) {
-                                    final String option = options.elementAt(index);
-                                    return InkWell(
-                                      onTap: () => onSelected(option),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-                                        child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      Autocomplete<String>(
-                        optionsBuilder: (TextEditingValue textEditingValue) {
-                          if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
-                          return listaAssuntos.where((String option) {
-                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
-                          });
-                        },
-                        onSelected: (String selection) {
-                          assuntoController.text = selection; 
-                        },
-                        fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
-                          fieldController.addListener(() {
-                            assuntoController.text = fieldController.text;
-                          });
-
-                          return TextFormField(
-                            controller: fieldController,
-                            focusNode: fieldFocusNode,
-                            decoration: InputDecoration(
-                              labelText: 'Assunto (Opcional)',
-                              hintText: 'Ex: Geometria Analítica',
-                              hintStyle: TextStyle(color: Colors.grey.shade700),
-                              labelStyle: TextStyle(color: Colors.grey.shade500),
-                              filled: true,
-                              fillColor: const Color(0xFF0F0F0F),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            ),
-                            style: const TextStyle(color: Colors.white),
-                          );
-                        },
-                        optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
-                          return Align(
-                            alignment: Alignment.topLeft,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: Container(
-                                width: MediaQuery.of(context).size.width - 48, 
-                                margin: const EdgeInsets.only(top: 8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF2D2D2D),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.grey.shade800),
-                                ),
-                                child: ListView.builder(
-                                  padding: EdgeInsets.zero,
-                                  shrinkWrap: true,
-                                  itemCount: options.length,
-                                  itemBuilder: (BuildContext context, int index) {
-                                    final String option = options.elementAt(index);
-                                    return InkWell(
-                                      onTap: () => onSelected(option),
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-                                        child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      DropdownButtonFormField<String>(
-                        value: tipoSelecionado,
-                        dropdownColor: const Color(0xFF2D2D2D),
-                        validator: (value) => (value == null || value.isEmpty) ? 'Selecione um tipo' : null,
-                        decoration: InputDecoration(labelText: 'Tipo de estudo *', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                        items: _tiposDeEstudo.map((String tipo) {
-                          return DropdownMenuItem<String>(value: tipo, child: Text(tipo, style: const TextStyle(color: Colors.white)));
-                        }).toList(),
-                        onChanged: (String? novoValor) {
-                          setModalState(() {
-                            tipoSelecionado = novoValor;
-                            if (!mostrarCamposDeQuestao) {
-                              totalQuestoesController.clear();
-                              acertosController.clear();
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      if (mostrarCamposDeQuestao) ...[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: totalQuestoesController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(labelText: 'Total Questões', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: TextFormField(
-                                controller: acertosController,
-                                keyboardType: TextInputType.number,
-                                validator: (value) {
-                                  if (value != null && value.isNotEmpty && totalQuestoesController.text.isNotEmpty) {
-                                    int? acertos = int.tryParse(value);
-                                    int? total = int.tryParse(totalQuestoesController.text);
-                                    if (acertos != null && total != null && acertos > total) return 'Acertos > Total';
-                                  }
-                                  return null;
-                                },
-                                decoration: InputDecoration(labelText: 'Acertos', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      TextFormField(
-                        controller: obsController,
-                        maxLines: 2,
-                        decoration: InputDecoration(labelText: 'Observações (Opcional)', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      const SizedBox(height: 32),
-
-                      ElevatedButton(
-                        onPressed: () async {
-                          if (formKey.currentState!.validate()) {
-                            
-                            int duracaoSegundosFinal = 0;
-                            
-                            if (modoTempo == 'Duração Total') {
-                              int h = int.tryParse(horasController.text) ?? 0;
-                              int m = int.tryParse(minutosController.text) ?? 0;
-                              duracaoSegundosFinal = (h * 3600) + (m * 60);
-                            } else if (modoTempo == 'Início e Fim') {
-                              if (horaInicio != null && horaFim != null) {
-                                int startMin = horaInicio!.hour * 60 + horaInicio!.minute;
-                                int endMin = horaFim!.hour * 60 + horaFim!.minute;
-                                if (endMin < startMin) endMin += 24 * 60; 
-                                duracaoSegundosFinal = (endMin - startMin) * 60;
-                              }
-                            } else if (modoTempo == 'Sem tempo (Só questões)') {
-                              duracaoSegundosFinal = 0;
-                            }
-
-                            // CODE REVIEW: Bloqueio contra sessões inválidas (0 segundos)
-                            if (modoTempo != 'Sem tempo (Só questões)' && duracaoSegundosFinal <= 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Insira um tempo válido ou escolha "Sem tempo".', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  backgroundColor: Color(0xFFE57373),
-                                ),
-                              );
-                              return; // Interrompe o processo de salvar
-                            }
-
-                            final novaSessao = SessaoEstudo(
-                              materia: materiaController.text,
-                              assunto: assuntoController.text, 
-                              tipoEstudo: tipoSelecionado!,
-                              observacoes: obsController.text,
-                              duracaoSegundos: duracaoSegundosFinal,
-                              data: dataEscolhida, 
-                              totalQuestoes: int.tryParse(totalQuestoesController.text),
-                              acertos: int.tryParse(acertosController.text),
-                            );
-
-                            final prefs = await SharedPreferences.getInstance();
-                            List<String> sessoesSalvas = prefs.getStringList('sessoes_estudo') ?? [];
-                            sessoesSalvas.add(jsonEncode(novaSessao.toJson()));
-                            await prefs.setStringList('sessoes_estudo', sessoesSalvas);
-
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              _atualizarDados(); 
-                              
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Sessão adicionada com sucesso!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                                  backgroundColor: Color(0xFF4DA6FF),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          backgroundColor: const Color(0xFF4DA6FF),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('Salvar Registo Manual', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+        return _PainelAdicionarManual(
+          listaMaterias: listaMaterias,
+          listaAssuntos: listaAssuntos,
+          aoSalvar: _atualizarDados,
         );
       },
-    ).whenComplete(() {
-      // CODE REVIEW: Limpeza de memória garantida ao fechar o modal
-      materiaController.dispose();
-      assuntoController.dispose();
-      obsController.dispose();
-      totalQuestoesController.dispose();
-      acertosController.dispose();
-      horasController.dispose();
-      minutosController.dispose();
-    });
+    );
   }
 
   @override
@@ -862,6 +419,547 @@ class _TelaBaseState extends State<TelaBase> {
             label: 'Desempenho',
           ),
         ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// O WIDGET ISOLADO PARA ADICIONAR SESSÃO MANUAL
+// =============================================================================
+class _PainelAdicionarManual extends StatefulWidget {
+  final List<String> listaMaterias;
+  final List<String> listaAssuntos;
+  final VoidCallback aoSalvar;
+
+  const _PainelAdicionarManual({
+    required this.listaMaterias,
+    required this.listaAssuntos,
+    required this.aoSalvar,
+  });
+
+  @override
+  State<_PainelAdicionarManual> createState() => _PainelAdicionarManualState();
+}
+
+class _PainelAdicionarManualState extends State<_PainelAdicionarManual> {
+  final _formKey = GlobalKey<FormState>();
+  
+  String _materiaCapturada = '';
+  String _assuntoCapturado = '';
+  
+  final _obsController = TextEditingController();
+  final _totalQuestoesController = TextEditingController();
+  final _acertosController = TextEditingController();
+  final _horasController = TextEditingController();
+  final _minutosController = TextEditingController();
+  
+  String? _tipoSelecionado;
+  String _modoTempo = 'Duração Total'; 
+  DateTime _dataEscolhida = DateTime.now();
+  TimeOfDay? _horaInicio;
+  TimeOfDay? _horaFim;
+
+  final List<String> _tiposDeEstudo = [
+    'Teoria',
+    'Questões',
+    'Teoria e Questões',
+    'Prática de Redação',
+    'Simulado'
+  ];
+
+  @override
+  void dispose() {
+    _obsController.dispose();
+    _totalQuestoesController.dispose();
+    _acertosController.dispose();
+    _horasController.dispose();
+    _minutosController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _salvar() async {
+    if (_modoTempo == 'Início e Fim') {
+      if (_horaInicio == null || _horaFim == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor, defina a hora de Início e de Fim.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            backgroundColor: Color(0xFFE57373),
+          ),
+        );
+        return; 
+      }
+    }
+
+    if (_formKey.currentState!.validate()) {
+      int duracaoSegundosFinal = 0;
+      
+      if (_modoTempo == 'Duração Total') {
+        int h = int.tryParse(_horasController.text) ?? 0;
+        int m = int.tryParse(_minutosController.text) ?? 0;
+        duracaoSegundosFinal = (h * 3600) + (m * 60);
+      } else if (_modoTempo == 'Início e Fim') {
+        if (_horaInicio != null && _horaFim != null) {
+          int startMin = _horaInicio!.hour * 60 + _horaInicio!.minute;
+          int endMin = _horaFim!.hour * 60 + _horaFim!.minute;
+          if (endMin < startMin) endMin += 24 * 60; 
+          duracaoSegundosFinal = (endMin - startMin) * 60;
+        }
+      } else if (_modoTempo == 'Sem tempo (Só questões)') {
+        duracaoSegundosFinal = 0;
+      }
+
+      if (_modoTempo != 'Sem tempo (Só questões)' && duracaoSegundosFinal <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('A duração do estudo tem de ser maior que zero.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            backgroundColor: Color(0xFFE57373),
+          ),
+        );
+        return; 
+      }
+
+      final novaSessao = SessaoEstudo(
+        materia: _materiaCapturada, 
+        assunto: _assuntoCapturado, 
+        tipoEstudo: _tipoSelecionado!,
+        observacoes: _obsController.text,
+        duracaoSegundos: duracaoSegundosFinal,
+        data: _dataEscolhida, 
+        totalQuestoes: int.tryParse(_totalQuestoesController.text),
+        acertos: int.tryParse(_acertosController.text),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      List<String> sessoesSalvas = prefs.getStringList('sessoes_estudo') ?? [];
+      sessoesSalvas.add(jsonEncode(novaSessao.toJson()));
+      await prefs.setStringList('sessoes_estudo', sessoesSalvas);
+
+      if (mounted) {
+        Navigator.pop(context);
+        widget.aoSalvar(); 
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sessão adicionada com sucesso!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            backgroundColor: Color(0xFF4DA6FF),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    bool mostrarCamposDeQuestao = _tipoSelecionado == 'Questões' || _tipoSelecionado == 'Teoria e Questões' || _tipoSelecionado == 'Simulado';
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 24,
+        right: 24,
+        top: 24,
+      ),
+      child: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Adicionar Sessão Manual',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 24),
+
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_month_rounded, color: Color(0xFF4DA6FF)),
+                title: const Text('Data do Estudo', style: TextStyle(color: Colors.grey, fontSize: 14)),
+                subtitle: Text(
+                  "${_dataEscolhida.day.toString().padLeft(2, '0')}/${_dataEscolhida.month.toString().padLeft(2, '0')}/${_dataEscolhida.year}",
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                trailing: TextButton(
+                  onPressed: () async {
+                    final DateTime? escolhida = await showDatePicker(
+                      context: context,
+                      initialDate: _dataEscolhida,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now(),
+                      builder: (context, child) {
+                        return Theme(
+                          data: ThemeData.dark().copyWith(
+                            colorScheme: const ColorScheme.dark(
+                              primary: Color(0xFF4DA6FF),
+                              surface: Color(0xFF2D2D2D),
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
+                    );
+                    if (escolhida != null) {
+                      setState(() => _dataEscolhida = escolhida);
+                    }
+                  },
+                  child: const Text('Alterar', style: TextStyle(color: Color(0xFF4DA6FF))),
+                ),
+              ),
+              Divider(color: Colors.grey.shade800),
+              const SizedBox(height: 16),
+
+              const Text('Método de Tempo', style: TextStyle(color: Colors.grey, fontSize: 14)),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _modoTempo,
+                dropdownColor: const Color(0xFF2D2D2D),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFF0F0F0F),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+                items: ['Duração Total', 'Início e Fim', 'Sem tempo (Só questões)'].map((String modo) {
+                  return DropdownMenuItem<String>(
+                    value: modo,
+                    child: Text(modo, style: const TextStyle(color: Colors.white)),
+                  );
+                }).toList(),
+                onChanged: (String? novoValor) {
+                  setState(() {
+                    _modoTempo = novoValor!;
+                    // REGRA DE UX: Se for sem tempo, tranca o tipo em Questões
+                    if (_modoTempo == 'Sem tempo (Só questões)') {
+                      _tipoSelecionado = 'Questões';
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+
+              if (_modoTempo == 'Duração Total')
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start, 
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _horasController,
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          int h = int.tryParse(_horasController.text) ?? 0;
+                          int m = int.tryParse(_minutosController.text) ?? 0;
+                          if (h <= 0 && m <= 0) return 'Campo obrigatório';
+                          return null;
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Horas *', 
+                          filled: true, 
+                          fillColor: const Color(0xFF0F0F0F), 
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+                          errorStyle: const TextStyle(fontSize: 10),
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _minutosController,
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          int h = int.tryParse(_horasController.text) ?? 0;
+                          int m = int.tryParse(_minutosController.text) ?? 0;
+                          if (h <= 0 && m <= 0) return 'Campo obrigatório';
+                          return null;
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Minutos *', 
+                          filled: true, 
+                          fillColor: const Color(0xFF0F0F0F), 
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+                          errorStyle: const TextStyle(fontSize: 10),
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                )
+              else if (_modoTempo == 'Início e Fim')
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final TimeOfDay? time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+                          if (time != null) setState(() => _horaInicio = time);
+                        },
+                        icon: const Icon(Icons.access_time),
+                        label: Text(_horaInicio == null ? 'Início *' : _horaInicio!.format(context)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F0F0F), 
+                          foregroundColor: Colors.white, 
+                          padding: const EdgeInsets.symmetric(vertical: 16), 
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          side: _horaInicio == null ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final TimeOfDay? time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+                          if (time != null) setState(() => _horaFim = time);
+                        },
+                        icon: const Icon(Icons.access_time_filled),
+                        label: Text(_horaFim == null ? 'Fim *' : _horaFim!.format(context)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F0F0F), 
+                          foregroundColor: Colors.white, 
+                          padding: const EdgeInsets.symmetric(vertical: 16), 
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          side: _horaFim == null ? const BorderSide(color: Colors.redAccent) : BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+              const SizedBox(height: 24),
+              Divider(color: Colors.grey.shade800),
+              const SizedBox(height: 16),
+
+              RawAutocomplete<String>(
+                textEditingController: TextEditingController(),
+                focusNode: FocusNode(),
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+                  return widget.listaMaterias.where((String option) {
+                    return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                  });
+                },
+                fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                  return TextFormField(
+                    controller: fieldController,
+                    focusNode: fieldFocusNode,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) return 'Obrigatório';
+                      _materiaCapturada = value; 
+                      return null;
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Matéria *',
+                      hintText: 'Ex: Matemática',
+                      hintStyle: TextStyle(color: Colors.grey.shade700),
+                      labelStyle: TextStyle(color: Colors.grey.shade500),
+                      filled: true,
+                      fillColor: const Color(0xFF0F0F0F),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                  );
+                },
+                optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        width: MediaQuery.of(context).size.width - 48, 
+                        margin: const EdgeInsets.only(top: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2D2D2D),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade800),
+                        ),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            final String option = options.elementAt(index);
+                            return InkWell(
+                              onTap: () => onSelected(option),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                                child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              RawAutocomplete<String>(
+                textEditingController: TextEditingController(),
+                focusNode: FocusNode(),
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+                  return widget.listaAssuntos.where((String option) {
+                    return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                  });
+                },
+                fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                  return TextFormField(
+                    controller: fieldController,
+                    focusNode: fieldFocusNode,
+                    validator: (value) {
+                      _assuntoCapturado = value ?? ''; 
+                      return null;
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Assunto (Opcional)',
+                      hintText: 'Ex: Geometria Analítica',
+                      hintStyle: TextStyle(color: Colors.grey.shade700),
+                      labelStyle: TextStyle(color: Colors.grey.shade500),
+                      filled: true,
+                      fillColor: const Color(0xFF0F0F0F),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                    style: const TextStyle(color: Colors.white),
+                  );
+                },
+                optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+                  return Align(
+                    alignment: Alignment.topLeft,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        width: MediaQuery.of(context).size.width - 48, 
+                        margin: const EdgeInsets.only(top: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2D2D2D),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade800),
+                        ),
+                        child: ListView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          itemCount: options.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            final String option = options.elementAt(index);
+                            return InkWell(
+                              onTap: () => onSelected(option),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                                child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              DropdownButtonFormField<String>(
+                value: _tipoSelecionado,
+                dropdownColor: const Color(0xFF2D2D2D),
+                validator: (value) => (value == null || value.isEmpty) ? 'Selecione um tipo' : null,
+                decoration: InputDecoration(
+                  labelText: 'Tipo de estudo *', 
+                  filled: true, 
+                  fillColor: const Color(0xFF0F0F0F), 
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), 
+                  errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1))
+                ),
+                items: _tiposDeEstudo.map((String tipo) {
+                  return DropdownMenuItem<String>(
+                    value: tipo, 
+                    // Se o dropdown for bloqueado, ele fica acinzentado automaticamente pelo Flutter, mas garantimos o estilo
+                    child: Text(tipo, style: const TextStyle(color: Colors.white))
+                  );
+                }).toList(),
+                // REGRA DE UX: Desativa (bloqueia) a alteração do Dropdown passando null para o onChanged
+                onChanged: _modoTempo == 'Sem tempo (Só questões)' ? null : (String? novoValor) {
+                  setState(() {
+                    _tipoSelecionado = novoValor;
+                    bool mostraQ = novoValor == 'Questões' || novoValor == 'Teoria e Questões' || novoValor == 'Simulado';
+                    if (!mostraQ) {
+                      _totalQuestoesController.clear();
+                      _acertosController.clear();
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+
+              if (mostrarCamposDeQuestao) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _totalQuestoesController,
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return 'Obrigatório';
+                          int? val = int.tryParse(value);
+                          if (val == null || val <= 0) return 'Deve ser > 0';
+                          return null;
+                        },
+                        decoration: InputDecoration(labelText: 'Total Questões *', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)), errorStyle: const TextStyle(fontSize: 10)),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _acertosController,
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return 'Obrigatório';
+                          int? acertos = int.tryParse(value);
+                          int? total = int.tryParse(_totalQuestoesController.text);
+                          if (acertos == null || acertos < 0) return 'Inválido';
+                          if (total != null && acertos > total) return 'Acertos > Total';
+                          return null;
+                        },
+                        decoration: InputDecoration(labelText: 'Acertos *', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none), errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)), errorStyle: const TextStyle(fontSize: 10)),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              TextFormField(
+                controller: _obsController,
+                maxLines: 2,
+                decoration: InputDecoration(labelText: 'Observações (Opcional)', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+                style: const TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: 32),
+
+              ElevatedButton(
+                onPressed: _salvar,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  backgroundColor: const Color(0xFF4DA6FF),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Salvar Registo Manual', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
       ),
     );
   }
