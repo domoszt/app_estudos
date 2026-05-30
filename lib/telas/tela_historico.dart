@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../modelos/sessao_estudo.dart';
 import 'tela_estatisticas.dart';
+import '../utilidades/gerador_cores.dart'; // <-- O NOSSO MOTOR DE CORES AQUI
 
 class TelaHistorico extends StatefulWidget {
   const TelaHistorico({super.key});
@@ -188,6 +189,8 @@ class _TelaHistoricoState extends State<TelaHistorico> {
   }
 
   void _mostrarDetalhes(SessaoEstudo sessao) {
+    Color corMateria = GeradorCores.obterCor(sessao.materia); // Adicionado o motor de cores aqui também!
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -202,16 +205,15 @@ class _TelaHistoricoState extends State<TelaHistorico> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Tempo: ${_formatarTempo(sessao.duracaoSegundos)}', style: const TextStyle(color: Color(0xFF4DA6FF), fontWeight: FontWeight.bold, fontSize: 16)),
+              Text('Tempo: ${_formatarTempo(sessao.duracaoSegundos)}', style: TextStyle(color: corMateria, fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 12),
               Text('Tipo: ${sessao.tipoEstudo}', style: const TextStyle(color: Colors.white)),
               
-              // SE TIVER QUESTÕES, ELE MOSTRA O DESEMPENHO E A %
               if (sessao.totalQuestoes != null && sessao.acertos != null) ...[
                 const SizedBox(height: 8),
                 Text(
                   'Desempenho: ${sessao.acertos} / ${sessao.totalQuestoes} questões (${((sessao.acertos! / sessao.totalQuestoes!) * 100).toStringAsFixed(1)}%)', 
-                  style: const TextStyle(color: Color(0xFF81C784), fontWeight: FontWeight.bold), // Verde
+                  style: const TextStyle(color: Color(0xFF81C784), fontWeight: FontWeight.bold), 
                 ),
               ],
               
@@ -231,7 +233,7 @@ class _TelaHistoricoState extends State<TelaHistorico> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Fechar', style: TextStyle(color: Color(0xFF4DA6FF))),
+              child: const Text('Fechar', style: TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -281,13 +283,24 @@ class _TelaHistoricoState extends State<TelaHistorico> {
     );
   }
 
-  void _mostrarEdicao(SessaoEstudo sessaoOriginal) {
+void _mostrarEdicao(SessaoEstudo sessaoOriginal) {
+    // 1. GERAR LISTAS ÚNICAS PARA O AUTOCOMPLETE BASEADO NA MEMÓRIA ATUAL
+    Set<String> materiasUnicas = {};
+    Set<String> assuntosUnicos = {};
+    
+    for (var s in _todasSessoes) {
+      if (s.materia.trim().isNotEmpty) materiasUnicas.add(s.materia.trim());
+      if (s.assunto.trim().isNotEmpty) assuntosUnicos.add(s.assunto.trim());
+    }
+    
+    List<String> listaMaterias = materiasUnicas.toList()..sort();
+    List<String> listaAssuntos = assuntosUnicos.toList()..sort();
+
     final formKey = GlobalKey<FormState>();
     final materiaController = TextEditingController(text: sessaoOriginal.materia);
     final assuntoController = TextEditingController(text: sessaoOriginal.assunto);
     final obsController = TextEditingController(text: sessaoOriginal.observacoes);
     
-    // Puxa os dados antigos se existirem
     final totalQuestoesController = TextEditingController(text: sessaoOriginal.totalQuestoes?.toString() ?? '');
     final acertosController = TextEditingController(text: sessaoOriginal.acertos?.toString() ?? '');
     
@@ -333,34 +346,135 @@ class _TelaHistoricoState extends State<TelaHistorico> {
                       ),
                       const SizedBox(height: 24),
 
-                      TextFormField(
-                        controller: materiaController,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) return 'Este campo é obrigatório';
-                          return null;
+                      // --- AUTOCOMPLETE: MATÉRIA (EDIÇÃO) ---
+                      Autocomplete<String>(
+                        initialValue: TextEditingValue(text: sessaoOriginal.materia),
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+                          return listaMaterias.where((String option) {
+                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                          });
                         },
-                        decoration: InputDecoration(
-                          labelText: 'Matéria *',
-                          labelStyle: TextStyle(color: Colors.grey.shade500),
-                          filled: true,
-                          fillColor: const Color(0xFF0F0F0F),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
-                        ),
-                        style: const TextStyle(color: Colors.white),
+                        onSelected: (String selection) {
+                          materiaController.text = selection; 
+                        },
+                        fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                          fieldController.addListener(() {
+                            materiaController.text = fieldController.text;
+                          });
+
+                          return TextFormField(
+                            controller: fieldController,
+                            focusNode: fieldFocusNode,
+                            validator: (value) => (value == null || value.trim().isEmpty) ? 'Este campo é obrigatório' : null,
+                            decoration: InputDecoration(
+                              labelText: 'Matéria *',
+                              labelStyle: TextStyle(color: Colors.grey.shade500),
+                              filled: true,
+                              fillColor: const Color(0xFF0F0F0F),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+                            ),
+                            style: const TextStyle(color: Colors.white),
+                          );
+                        },
+                        optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                width: MediaQuery.of(context).size.width - 48, 
+                                margin: const EdgeInsets.only(top: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2D2D2D),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey.shade800),
+                                ),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (BuildContext context, int index) {
+                                    final String option = options.elementAt(index);
+                                    return InkWell(
+                                      onTap: () => onSelected(option),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                                        child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
 
-                      TextFormField(
-                        controller: assuntoController,
-                        decoration: InputDecoration(
-                          labelText: 'Assunto (Opcional)',
-                          labelStyle: TextStyle(color: Colors.grey.shade500),
-                          filled: true,
-                          fillColor: const Color(0xFF0F0F0F),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                        ),
-                        style: const TextStyle(color: Colors.white),
+                      // --- AUTOCOMPLETE: ASSUNTO (EDIÇÃO) ---
+                      Autocomplete<String>(
+                        initialValue: TextEditingValue(text: sessaoOriginal.assunto),
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+                          return listaAssuntos.where((String option) {
+                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        onSelected: (String selection) {
+                          assuntoController.text = selection; 
+                        },
+                        fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                          fieldController.addListener(() {
+                            assuntoController.text = fieldController.text;
+                          });
+
+                          return TextFormField(
+                            controller: fieldController,
+                            focusNode: fieldFocusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Assunto (Opcional)',
+                              labelStyle: TextStyle(color: Colors.grey.shade500),
+                              filled: true,
+                              fillColor: const Color(0xFF0F0F0F),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            ),
+                            style: const TextStyle(color: Colors.white),
+                          );
+                        },
+                        optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                width: MediaQuery.of(context).size.width - 48, 
+                                margin: const EdgeInsets.only(top: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2D2D2D),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey.shade800),
+                                ),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (BuildContext context, int index) {
+                                    final String option = options.elementAt(index);
+                                    return InkWell(
+                                      onTap: () => onSelected(option),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                                        child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
 
@@ -396,7 +510,6 @@ class _TelaHistoricoState extends State<TelaHistorico> {
                         },
                       ),
                       
-                      // --- CAMPOS DE QUESTÕES NO MODO DE EDIÇÃO ---
                       if (mostrarCamposDeQuestao) ...[
                         const SizedBox(height: 16),
                         Row(
@@ -470,8 +583,8 @@ class _TelaHistoricoState extends State<TelaHistorico> {
                             
                             if (index != -1) {
                               _todasSessoes[index] = SessaoEstudo(
-                                materia: materiaController.text,
-                                assunto: assuntoController.text,
+                                materia: materiaController.text, // Usa o texto do Autocomplete
+                                assunto: assuntoController.text, // Usa o texto do Autocomplete
                                 tipoEstudo: tipoSelecionado!,
                                 observacoes: obsController.text,
                                 duracaoSegundos: sessaoOriginal.duracaoSegundos, 
@@ -512,8 +625,7 @@ class _TelaHistoricoState extends State<TelaHistorico> {
       },
     );
   }
-
-  // ... [O resto do código abaixo (Gráficos, Heatmap, Lista, etc) permanece EXATAMENTE igual]
+  
   Widget _construirGraficoBarras() {
     return Container(
       key: const ValueKey('barras'),
@@ -704,6 +816,9 @@ class _TelaHistoricoState extends State<TelaHistorico> {
             itemBuilder: (context, index) {
               final sessao = sessoesDoDia[index];
               
+              // CHAMADA MÁGICA DO MOTOR DE CORES PARA A LISTA
+              Color corMateria = GeradorCores.obterCor(sessao.materia);
+
               return GestureDetector(
                 onLongPress: () => _mostrarMenuOpcoes(sessao),
                 child: Container(
@@ -719,7 +834,7 @@ class _TelaHistoricoState extends State<TelaHistorico> {
                         width: 4,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF4DA6FF),
+                          color: corMateria, // A BARRA VERTICAL AGORA USA A COR DA MATÉRIA
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -744,7 +859,7 @@ class _TelaHistoricoState extends State<TelaHistorico> {
                       ),
                       Text(
                         _formatarTempo(sessao.duracaoSegundos),
-                        style: const TextStyle(color: Color(0xFF4DA6FF), fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(color: corMateria, fontWeight: FontWeight.bold, fontSize: 16), // O TEMPO TAMBÉM ACOMPANHA A COR
                       ),
                     ],
                   ),

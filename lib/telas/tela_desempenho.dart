@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../modelos/sessao_estudo.dart';
+import '../utilidades/gerador_cores.dart'; // Importamos o nosso motor de cores!
 
 class TelaDesempenho extends StatefulWidget {
   const TelaDesempenho({super.key});
@@ -14,12 +15,9 @@ class TelaDesempenho extends StatefulWidget {
 class _TelaDesempenhoState extends State<TelaDesempenho> {
   bool _carregando = true;
   
-  // Controle da visualização do Gráfico
   bool _mostrarGraficoBarras = true;
-  
-  // Controle do Diagnóstico (Raio-X)
-  bool _verAssuntos = false; // false = Matérias, true = Assuntos
-  bool _pioresPrimeiro = true; // true = Piores no topo
+  bool _verAssuntos = false; 
+  bool _pioresPrimeiro = true; 
   
   final Map<DateTime, Map<String, int>> _questoesPorDia = {};
   final List<DateTime> _ultimos7Dias = [];
@@ -28,7 +26,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
   int _totalSemana = 0;
   int _acertosSemana = 0;
 
-  // Listas de Raio-X
   List<Map<String, dynamic>> _listaRaioXMaterias = [];
   List<Map<String, dynamic>> _listaRaioXAssuntos = [];
 
@@ -53,7 +50,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
     _questoesPorDia.clear();
     DateTime hoje = _zerarHorario(DateTime.now());
     
-    // Mapas para o Raio-X
     Map<String, Map<String, int>> mapMaterias = {};
     Map<String, Map<String, int>> mapAssuntos = {};
     
@@ -61,24 +57,20 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
       if (sessao.totalQuestoes != null && sessao.acertos != null && sessao.totalQuestoes! > 0) {
         DateTime diaLimpo = _zerarHorario(sessao.data);
         
-        // --- 1. PREPARAR DADOS PARA O GRÁFICO DIÁRIO ---
         if (!_questoesPorDia.containsKey(diaLimpo)) {
           _questoesPorDia[diaLimpo] = {'total': 0, 'acertos': 0};
         }
         _questoesPorDia[diaLimpo]!['total'] = _questoesPorDia[diaLimpo]!['total']! + sessao.totalQuestoes!;
         _questoesPorDia[diaLimpo]!['acertos'] = _questoesPorDia[diaLimpo]!['acertos']! + sessao.acertos!;
 
-        // --- 2. PREPARAR DADOS PARA O RAIO-X (Somente últimos 7 dias) ---
         int diferencaDias = hoje.difference(diaLimpo).inDays;
         if (diferencaDias >= 0 && diferencaDias <= 6) {
-          // Agrupar por Matéria
           if (!mapMaterias.containsKey(sessao.materia)) {
             mapMaterias[sessao.materia] = {'total': 0, 'acertos': 0};
           }
           mapMaterias[sessao.materia]!['total'] = mapMaterias[sessao.materia]!['total']! + sessao.totalQuestoes!;
           mapMaterias[sessao.materia]!['acertos'] = mapMaterias[sessao.materia]!['acertos']! + sessao.acertos!;
 
-          // Agrupar por Assunto (Formato: "Matéria: Assunto")
           String nomeAssunto = sessao.assunto.trim().isEmpty ? 'Geral' : sessao.assunto.trim();
           String chaveAssunto = '${sessao.materia}: $nomeAssunto';
           
@@ -91,10 +83,10 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
       }
     }
 
-    // --- 3. TRANSFORMAR MAPAS EM LISTAS E CALCULAR PERCENTAGEM ---
     _listaRaioXMaterias = mapMaterias.entries.map((e) {
       return {
         'nome': e.key,
+        'materia_base': e.key, // Guarda o nome base para gerar a cor
         'total': e.value['total'],
         'acertos': e.value['acertos'],
         'percentual': (e.value['acertos']! / e.value['total']!) * 100,
@@ -104,6 +96,7 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
     _listaRaioXAssuntos = mapAssuntos.entries.map((e) {
       return {
         'nome': e.key,
+        'materia_base': e.key.split(':').first.trim(), // Extrai a matéria base para herdar a cor!
         'total': e.value['total'],
         'acertos': e.value['acertos'],
         'percentual': (e.value['acertos']! / e.value['total']!) * 100,
@@ -112,7 +105,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
 
     _ordenarListasRaioX();
 
-    // --- 4. PREPARAR DADOS DE RESUMO DA SEMANA ---
     _ultimos7Dias.clear();
     _maiorTotalNaSemana = 0;
     _totalSemana = 0;
@@ -138,13 +130,12 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
     });
   }
 
-  // Função para ordenar a lista de acordo com o botão clicado
   void _ordenarListasRaioX() {
     int sortFunc(Map<String, dynamic> a, Map<String, dynamic> b) {
       if (_pioresPrimeiro) {
-        return a['percentual'].compareTo(b['percentual']); // Crescente (Piores primeiro)
+        return a['percentual'].compareTo(b['percentual']); 
       } else {
-        return b['percentual'].compareTo(a['percentual']); // Decrescente (Melhores primeiro)
+        return b['percentual'].compareTo(a['percentual']); 
       }
     }
     _listaRaioXMaterias.sort(sortFunc);
@@ -164,9 +155,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
     }
   }
 
-  // ===========================================================================
-  // GRÁFICOS (Barras e Linhas)
-  // ===========================================================================
   Widget _construirGraficoBarrasDuplas() {
     return Container(
       key: const ValueKey('barras'),
@@ -325,17 +313,12 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
     );
   }
 
-  // ===========================================================================
-  // NOVO: LISTA DE RAIO-X (DIAGNÓSTICO)
-  // ===========================================================================
   Widget _construirRaioX() {
-    // Escolhe qual lista mostrar baseado no botão de alternância
     List<Map<String, dynamic>> listaAtual = _verAssuntos ? _listaRaioXAssuntos : _listaRaioXMaterias;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Cabeçalho do Raio-X
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -343,7 +326,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
               'Diagnóstico de Precisão',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
             ),
-            // Botão de Inverter Ordem
             TextButton.icon(
               onPressed: () {
                 setState(() {
@@ -366,7 +348,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
         ),
         const SizedBox(height: 16),
         
-        // Controle Deslizante (Matérias <--> Assuntos)
         Container(
           decoration: BoxDecoration(
             color: const Color(0xFF1C1C1C),
@@ -414,7 +395,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
         ),
         const SizedBox(height: 24),
 
-        // A Lista do Semáforo
         if (listaAtual.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 32.0),
@@ -429,13 +409,16 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
         else
           ListView.builder(
             shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(), // Evita scroll duplo com a página
+            physics: const NeverScrollableScrollPhysics(), 
             itemCount: listaAtual.length,
             itemBuilder: (context, index) {
               final item = listaAtual[index];
               double perc = item['percentual'];
               
-              // Lógica Semáforo
+              // O Motor de Cores entra em ação aqui!
+              Color corMateria = GeradorCores.obterCor(item['materia_base']);
+              
+              // O semáforo da barra de progresso continua igual para indicar perigo
               Color corBarra = perc >= 70 ? const Color(0xFF81C784) : (perc >= 50 ? const Color(0xFFFF9900) : const Color(0xFFE57373));
 
               return Container(
@@ -453,9 +436,18 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
-                          child: Text(
-                            item['nome'], 
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)
+                          child: Row(
+                            children: [
+                              // A BOLINHA DE COR DA MATÉRIA
+                              Icon(Icons.circle, color: corMateria, size: 12),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  item['nome'], 
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         Text(
@@ -465,12 +457,14 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      '${item['acertos']} acertos em ${item['total']} questões', 
-                      style: const TextStyle(color: Colors.grey, fontSize: 12)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20.0), // Alinha com o texto, saltando a bolinha
+                      child: Text(
+                        '${item['acertos']} acertos em ${item['total']} questões', 
+                        style: const TextStyle(color: Colors.grey, fontSize: 12)
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    // Barra de Progresso visual super refinada
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
@@ -505,7 +499,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // CARD DE RESUMO
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -541,7 +534,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
 
               const SizedBox(height: 40),
 
-              // CABEÇALHO DO GRÁFICO DIÁRIO
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -577,7 +569,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
               
               const SizedBox(height: 40),
               
-              // --- A NOVA MÁGICA: O RAIO-X ---
               _construirRaioX(),
 
               const SizedBox(height: 24),
@@ -589,7 +580,6 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
   }
 }
 
-// PINTOR DO GRÁFICO DE LINHAS
 class _GraficoLinhasPainter extends CustomPainter {
   final Map<DateTime, Map<String, int>> questoesPorDia;
   final List<DateTime> dias;
