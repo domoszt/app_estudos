@@ -1,11 +1,12 @@
+// lib/telas/tela_modo_prova.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vibration/vibration.dart'; // Mantém o motor de vibração nativo
 import '../modelos/sessao_estudo.dart';
-import 'package:vibration/vibration.dart';
 
 class TelaModoProva extends StatefulWidget {
   const TelaModoProva({super.key});
@@ -56,16 +57,34 @@ class _TelaModoProvaState extends State<TelaModoProva> {
     if (tempoEsgotado) {
       setState(() { _tempoRestanteSegundos = 0; });
       
-      // O ALARME VIBRATÓRIO DEFINITIVO
       bool? temVibrador = await Vibration.hasVibrator();
       if (temVibrador == true) {
-        // Padrão: [espera, vibra, espera, vibra, espera, vibra] em milissegundos
         Vibration.vibrate(pattern: [0, 1000, 500, 1000, 500, 1000]); 
       }
     }
 
+    // --- CARREGAR HISTÓRICO ANTES DE ABRIR O PAINEL AUTOMÁTICO ---
+    final prefs = await SharedPreferences.getInstance();
+    List<String> dados = prefs.getStringList('sessoes_estudo') ?? [];
+    
+    Set<String> materiasUnicas = {}; 
+    Set<String> assuntosUnicos = {}; 
+    
+    for (var jsonStr in dados) {
+      var map = jsonDecode(jsonStr);
+      if (map['materia'] != null && map['materia'].toString().trim().isNotEmpty) {
+        materiasUnicas.add(map['materia'].toString().trim());
+      }
+      if (map['assunto'] != null && map['assunto'].toString().trim().isNotEmpty) {
+        assuntosUnicos.add(map['assunto'].toString().trim());
+      }
+    }
+    
+    List<String> listaMaterias = materiasUnicas.toList()..sort();
+    List<String> listaAssuntos = assuntosUnicos.toList()..sort();
+
     if (mounted) {
-      _abrirPainelPosProva();
+      _abrirPainelPosProva(listaMaterias, listaAssuntos);
     }
   }
 
@@ -105,7 +124,7 @@ class _TelaModoProvaState extends State<TelaModoProva> {
     );
   }
 
-  void _abrirPainelPosProva() {
+  void _abrirPainelPosProva(List<String> listaMaterias, List<String> listaAssuntos) {
     final formKey = GlobalKey<FormState>();
     final materiaController = TextEditingController();
     final assuntoController = TextEditingController();
@@ -150,12 +169,138 @@ class _TelaModoProvaState extends State<TelaModoProva> {
                   ),
                   const SizedBox(height: 32),
 
-                  TextFormField(
-                    controller: materiaController,
-                    validator: (value) => (value == null || value.trim().isEmpty) ? 'Obrigatório' : null,
-                    decoration: InputDecoration(labelText: 'Qual foi o Simulado? (Ex: EsPCEx, ENEM)*', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                    style: const TextStyle(color: Colors.white),
+                  // --- AUTOCOMPLETE: MATÉRIA (NOME DO SIMULADO) ---
+                  Autocomplete<String>(
+                    optionsBuilder: (TextEditingValue textEditingValue) {
+                      if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+                      return listaMaterias.where((String option) {
+                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                      });
+                    },
+                    onSelected: (String selection) {
+                      materiaController.text = selection; 
+                    },
+                    fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                      fieldController.addListener(() {
+                        materiaController.text = fieldController.text;
+                      });
+
+                      return TextFormField(
+                        controller: fieldController,
+                        focusNode: fieldFocusNode,
+                        validator: (value) => (value == null || value.trim().isEmpty) ? 'Obrigatório' : null,
+                        decoration: InputDecoration(
+                          labelText: 'Qual foi o Simulado? (Ex: EsPCEx, ENEM)*',
+                          labelStyle: TextStyle(color: Colors.grey.shade500),
+                          filled: true,
+                          fillColor: const Color(0xFF0F0F0F),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                      );
+                    },
+                    optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: Container(
+                            width: MediaQuery.of(context).size.width - 48, 
+                            margin: const EdgeInsets.only(top: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2D2D2D),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade800),
+                            ),
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (BuildContext context, int index) {
+                                final String option = options.elementAt(index);
+                                return InkWell(
+                                  onTap: () => onSelected(option),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                                    child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
+
+                  const SizedBox(height: 16),
+
+                  // --- AUTOCOMPLETE: ASSUNTO ---
+                  Autocomplete<String>(
+                    optionsBuilder: (TextEditingValue textEditingValue) {
+                      if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+                      return listaAssuntos.where((String option) {
+                        return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                      });
+                    },
+                    onSelected: (String selection) {
+                      assuntoController.text = selection; 
+                    },
+                    fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                      fieldController.addListener(() {
+                        assuntoController.text = fieldController.text;
+                      });
+
+                      return TextFormField(
+                        controller: fieldController,
+                        focusNode: fieldFocusNode,
+                        decoration: InputDecoration(
+                          labelText: 'Assunto (Opcional)',
+                          hintText: 'Ex: Geometria Analítica',
+                          hintStyle: TextStyle(color: Colors.grey.shade700),
+                          labelStyle: TextStyle(color: Colors.grey.shade500),
+                          filled: true,
+                          fillColor: const Color(0xFF0F0F0F),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                      );
+                    },
+                    optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: Container(
+                            width: MediaQuery.of(context).size.width - 48, 
+                            margin: const EdgeInsets.only(top: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2D2D2D),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade800),
+                            ),
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              shrinkWrap: true,
+                              itemCount: options.length,
+                              itemBuilder: (BuildContext context, int index) {
+                                final String option = options.elementAt(index);
+                                return InkWell(
+                                  onTap: () => onSelected(option),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                                    child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
                   const SizedBox(height: 16),
 
                   Row(
@@ -251,13 +396,13 @@ class _TelaModoProvaState extends State<TelaModoProva> {
 
   String _formatarTempo(int segundosTotais) {
     int horas = segundosTotais ~/ 3600;
-    int minutos = (segundosTotais % 3600) ~/ 60;
+    int minutes = (segundosTotais % 3600) ~/ 60;
     int segundos = segundosTotais % 60;
     
     if (horas > 0) {
-      return '${horas.toString().padLeft(2, '0')}:${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
+      return '${horas.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
     }
-    return '${minutos.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
+    return '${minutes.toString().padLeft(2, '0')}:${segundos.toString().padLeft(2, '0')}';
   }
 
   @override

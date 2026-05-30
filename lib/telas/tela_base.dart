@@ -1,13 +1,13 @@
 // lib/telas/tela_base.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Biblioteca nativa para usar a Área de Transferência (Clipboard)
+import 'package:flutter/services.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
 import '../modelos/sessao_estudo.dart';
 import 'tela_cronometro.dart';
 import 'tela_historico.dart';
 import 'tela_desempenho.dart';
-import 'tela_modo_prova.dart'; // Adicione esta linha aos imports!
+import 'tela_modo_prova.dart';
 
 class TelaBase extends StatefulWidget {
   const TelaBase({super.key});
@@ -50,12 +50,9 @@ class _TelaBaseState extends State<TelaBase> {
       return;
     }
 
-    // Pega na lista de sessões, transforma num JSON, e depois criptografa em Base64
-    // Isso cria um bloco de texto contínuo e seguro, impossível de ser quebrado acidentalmente
     String jsonString = jsonEncode(sessoes);
     String codigoSeguranca = base64Encode(utf8.encode(jsonString));
 
-    // Copia o código para o telemóvel do utilizador
     await Clipboard.setData(ClipboardData(text: codigoSeguranca));
 
     if (mounted) {
@@ -139,11 +136,8 @@ class _TelaBaseState extends State<TelaBase> {
               if (codigoColado.isEmpty) return;
 
               try {
-                // Faz a engenharia reversa: Descriptografa Base64 -> Transforma em JSON -> Salva no banco
                 String jsonString = utf8.decode(base64Decode(codigoColado));
                 List<dynamic> dadosDecodificados = jsonDecode(jsonString);
-                
-                // Converte de volta para a nossa Lista de Strings que o banco entende
                 List<String> sessoesParaSalvar = dadosDecodificados.map((e) => e.toString()).toList();
 
                 final prefs = await SharedPreferences.getInstance();
@@ -151,22 +145,21 @@ class _TelaBaseState extends State<TelaBase> {
 
                 if (mounted) {
                   Navigator.pop(context);
-                  _atualizarDados(); // Atualiza os ecrãs
+                  _atualizarDados(); 
                   
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Dados restaurados com sucesso! 🚀', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                      backgroundColor: Color(0xFF81C784), // Verde
+                      backgroundColor: Color(0xFF81C784), 
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
                 }
               } catch (e) {
-                // Se o utilizador colar um texto normal ou faltar uma letra no código, a app deteta o erro
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Código inválido ou corrompido.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                    backgroundColor: Color(0xFFE57373), // Vermelho
+                    backgroundColor: Color(0xFFE57373), 
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
@@ -232,9 +225,31 @@ class _TelaBaseState extends State<TelaBase> {
   }
 
   // ===========================================================================
-  // ADICIONAR MANUALMENTE
+  // ADICIONAR MANUALMENTE (AGORA COM AUTOCOMPLETE)
   // ===========================================================================
-  void _abrirPainelAdicionarManual() {
+  void _abrirPainelAdicionarManual() async {
+    // --- LÊ O HISTÓRICO ANTES DE ABRIR O MODAL ---
+    final prefs = await SharedPreferences.getInstance();
+    List<String> dados = prefs.getStringList('sessoes_estudo') ?? [];
+    
+    Set<String> materiasUnicas = {}; 
+    Set<String> assuntosUnicos = {}; 
+    
+    for (var jsonStr in dados) {
+      var map = jsonDecode(jsonStr);
+      if (map['materia'] != null && map['materia'].toString().trim().isNotEmpty) {
+        materiasUnicas.add(map['materia'].toString().trim());
+      }
+      if (map['assunto'] != null && map['assunto'].toString().trim().isNotEmpty) {
+        assuntosUnicos.add(map['assunto'].toString().trim());
+      }
+    }
+    
+    List<String> listaMaterias = materiasUnicas.toList()..sort();
+    List<String> listaAssuntos = assuntosUnicos.toList()..sort();
+
+    if (!mounted) return;
+
     final formKey = GlobalKey<FormState>();
     
     final materiaController = TextEditingController();
@@ -399,12 +414,140 @@ class _TelaBaseState extends State<TelaBase> {
                       Divider(color: Colors.grey.shade800),
                       const SizedBox(height: 16),
 
-                      TextFormField(
-                        controller: materiaController,
-                        validator: (value) => (value == null || value.trim().isEmpty) ? 'Obrigatório' : null,
-                        decoration: InputDecoration(labelText: 'Matéria *', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                        style: const TextStyle(color: Colors.white),
+                      // --- AUTOCOMPLETE: MATÉRIA ---
+                      Autocomplete<String>(
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+                          return listaMaterias.where((String option) {
+                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        onSelected: (String selection) {
+                          materiaController.text = selection; 
+                        },
+                        fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                          fieldController.addListener(() {
+                            materiaController.text = fieldController.text;
+                          });
+
+                          return TextFormField(
+                            controller: fieldController,
+                            focusNode: fieldFocusNode,
+                            validator: (value) => (value == null || value.trim().isEmpty) ? 'Obrigatório' : null,
+                            decoration: InputDecoration(
+                              labelText: 'Matéria *',
+                              hintText: 'Ex: Matemática',
+                              hintStyle: TextStyle(color: Colors.grey.shade700),
+                              labelStyle: TextStyle(color: Colors.grey.shade500),
+                              filled: true,
+                              fillColor: const Color(0xFF0F0F0F),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+                            ),
+                            style: const TextStyle(color: Colors.white),
+                          );
+                        },
+                        optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                width: MediaQuery.of(context).size.width - 48, 
+                                margin: const EdgeInsets.only(top: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2D2D2D),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey.shade800),
+                                ),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (BuildContext context, int index) {
+                                    final String option = options.elementAt(index);
+                                    return InkWell(
+                                      onTap: () => onSelected(option),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                                        child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
+
+                      const SizedBox(height: 16),
+
+                      // --- AUTOCOMPLETE: ASSUNTO ---
+                      Autocomplete<String>(
+                        optionsBuilder: (TextEditingValue textEditingValue) {
+                          if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
+                          return listaAssuntos.where((String option) {
+                            return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                          });
+                        },
+                        onSelected: (String selection) {
+                          assuntoController.text = selection; 
+                        },
+                        fieldViewBuilder: (BuildContext context, TextEditingController fieldController, FocusNode fieldFocusNode, VoidCallback onFieldSubmitted) {
+                          fieldController.addListener(() {
+                            assuntoController.text = fieldController.text;
+                          });
+
+                          return TextFormField(
+                            controller: fieldController,
+                            focusNode: fieldFocusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Assunto (Opcional)',
+                              hintText: 'Ex: Geometria Analítica',
+                              hintStyle: TextStyle(color: Colors.grey.shade700),
+                              labelStyle: TextStyle(color: Colors.grey.shade500),
+                              filled: true,
+                              fillColor: const Color(0xFF0F0F0F),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            ),
+                            style: const TextStyle(color: Colors.white),
+                          );
+                        },
+                        optionsViewBuilder: (BuildContext context, AutocompleteOnSelected<String> onSelected, Iterable<String> options) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: Container(
+                                width: MediaQuery.of(context).size.width - 48, 
+                                margin: const EdgeInsets.only(top: 8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2D2D2D),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.grey.shade800),
+                                ),
+                                child: ListView.builder(
+                                  padding: EdgeInsets.zero,
+                                  shrinkWrap: true,
+                                  itemCount: options.length,
+                                  itemBuilder: (BuildContext context, int index) {
+                                    final String option = options.elementAt(index);
+                                    return InkWell(
+                                      onTap: () => onSelected(option),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+                                        child: Text(option, style: const TextStyle(color: Colors.white, fontSize: 15)),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+
                       const SizedBox(height: 16),
 
                       DropdownButtonFormField<String>(
@@ -462,13 +605,6 @@ class _TelaBaseState extends State<TelaBase> {
                       ],
 
                       TextFormField(
-                        controller: assuntoController,
-                        decoration: InputDecoration(labelText: 'Assunto (Opcional)', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                      const SizedBox(height: 16),
-
-                      TextFormField(
                         controller: obsController,
                         maxLines: 2,
                         decoration: InputDecoration(labelText: 'Observações (Opcional)', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
@@ -498,8 +634,8 @@ class _TelaBaseState extends State<TelaBase> {
                             }
 
                             final novaSessao = SessaoEstudo(
-                              materia: materiaController.text,
-                              assunto: assuntoController.text,
+                              materia: materiaController.text, // Usa o valor do Autocomplete
+                              assunto: assuntoController.text, // Usa o valor do Autocomplete
                               tipoEstudo: tipoSelecionado!,
                               observacoes: obsController.text,
                               duracaoSegundos: duracaoSegundosFinal,
@@ -559,9 +695,6 @@ class _TelaBaseState extends State<TelaBase> {
     }
 
     return Scaffold(
-      // =======================================================================
-      // MENU LATERAL (DRAWER) - AGORA COM BACKUP
-      // =======================================================================
       drawer: Drawer(
         backgroundColor: const Color(0xFF1C1C1C),
         child: Column(
@@ -600,30 +733,28 @@ class _TelaBaseState extends State<TelaBase> {
               subtitle: const Text('Inserir sessão passada', style: TextStyle(color: Colors.grey, fontSize: 12)),
               onTap: () {
                 Navigator.pop(context); 
-                _abrirPainelAdicionarManual();
+                _abrirPainelAdicionarManual(); // Agora usa a função atualizada
               },
             ),
             
-           ListTile(
-              leading: const Icon(Icons.flag_rounded, color: Color(0xFFE57373)), // Vermelho tático
+            ListTile(
+              leading: const Icon(Icons.flag_rounded, color: Color(0xFFE57373)), 
               title: const Text('Modo Prova', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               subtitle: const Text('Simulador sem pausas', style: TextStyle(color: Colors.grey, fontSize: 12)),
               onTap: () {
-                Navigator.pop(context); // Fecha a gaveta
+                Navigator.pop(context); 
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const TelaModoProva()),
-                ).then((_) => _atualizarDados()); // Atualiza gráficos ao voltar!
+                ).then((_) => _atualizarDados()); 
               },
             ),
-            // ---> ATÉ AQUI <---
-
+            
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
               child: Divider(color: Color(0xFF2D2D2D)),
             ),
             
-            // --- NOVOS BOTÕES DE SEGURANÇA ---
             ListTile(
               leading: const Icon(Icons.file_upload_outlined, color: Colors.white),
               title: const Text('Exportar Backup', style: TextStyle(color: Colors.white, fontSize: 16)),
@@ -658,8 +789,6 @@ class _TelaBaseState extends State<TelaBase> {
           ],
         ),
       ),
-
-      // =======================================================================
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
