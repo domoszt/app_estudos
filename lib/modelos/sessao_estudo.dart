@@ -7,7 +7,6 @@ class SessaoEstudo {
   final int duracaoSegundos;
   final DateTime data;
   
-  // --- NOVAS VARIÁVEIS OPCIONAIS (?) ---
   final int? totalQuestoes;
   final int? acertos;
 
@@ -33,13 +32,14 @@ class SessaoEstudo {
         'acertos': acertos,
       };
 
+  // REFATORAÇÃO: Proteção contra valores nulos (Fallbacks)
   factory SessaoEstudo.fromJson(Map<String, dynamic> json) => SessaoEstudo(
-        materia: json['materia'],
-        assunto: json['assunto'],
-        tipoEstudo: json['tipoEstudo'],
-        observacoes: json['observacoes'],
-        duracaoSegundos: json['duracaoSegundos'],
-        data: DateTime.parse(json['data']),
+        materia: json['materia'] ?? '',
+        assunto: json['assunto'] ?? '',
+        tipoEstudo: json['tipoEstudo'] ?? 'Indefinido',
+        observacoes: json['observacoes'] ?? '',
+        duracaoSegundos: json['duracaoSegundos'] ?? 0,
+        data: json['data'] != null ? DateTime.parse(json['data']) : DateTime.now(),
         totalQuestoes: json['totalQuestoes'],
         acertos: json['acertos'],
       );

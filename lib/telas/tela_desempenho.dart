@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../modelos/sessao_estudo.dart';
-import '../utilidades/gerador_cores.dart'; // Importamos o nosso motor de cores!
+import '../utilidades/gerador_cores.dart'; 
 
 class TelaDesempenho extends StatefulWidget {
   const TelaDesempenho({super.key});
@@ -124,6 +124,9 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
         _maiorTotalNaSemana = totalDoDia;
       }
     }
+
+    // CODE REVIEW: Proteção de ciclo de vida adicionada!
+    if (!mounted) return;
 
     setState(() {
       _carregando = false;

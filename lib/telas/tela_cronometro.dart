@@ -28,6 +28,10 @@ class _TelaCronometroState extends State<TelaCronometro> {
   final TextEditingController _totalQuestoesController = TextEditingController();
   final TextEditingController _acertosController = TextEditingController();
 
+  // CODE REVIEW: Variável movida para o escopo da classe para não perder o estado
+  // se o utilizador fechar o painel acidentalmente.
+  String? _tipoSelecionado; 
+
   final List<String> _tiposDeEstudo = [
     'Teoria',
     'Questões',
@@ -82,6 +86,7 @@ class _TelaCronometroState extends State<TelaCronometro> {
       _segundosAcumulados = 0;
       _segundosExibicao = 0;
       _horaUltimoPlay = null;
+      _tipoSelecionado = null; // CODE REVIEW: Limpamos o dropdown aqui
     });
     _materiaController.clear();
     _assuntoController.clear();
@@ -138,12 +143,11 @@ class _TelaCronometroState extends State<TelaCronometro> {
       _alternarCronometro();
     }
 
-    // --- CARREGAR HISTÓRICO DE MATÉRIAS E ASSUNTOS ---
     final prefs = await SharedPreferences.getInstance();
     List<String> dados = prefs.getStringList('sessoes_estudo') ?? [];
     
     Set<String> materiasUnicas = {}; 
-    Set<String> assuntosUnicos = {}; // Novo Set para assuntos únicos
+    Set<String> assuntosUnicos = {}; 
     
     for (var jsonStr in dados) {
       var map = jsonDecode(jsonStr);
@@ -156,12 +160,11 @@ class _TelaCronometroState extends State<TelaCronometro> {
     }
     
     List<String> listaMaterias = materiasUnicas.toList()..sort();
-    List<String> listaAssuntos = assuntosUnicos.toList()..sort(); // Nova lista ordenada de assuntos
+    List<String> listaAssuntos = assuntosUnicos.toList()..sort(); 
     
     if (!mounted) return; 
 
     final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-    String? tipoSelecionado;
 
     showModalBottomSheet(
       context: context,
@@ -172,7 +175,9 @@ class _TelaCronometroState extends State<TelaCronometro> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             
-            bool mostrarCamposDeQuestao = tipoSelecionado == 'Questões' || tipoSelecionado == 'Teoria e Questões' || tipoSelecionado == 'Simulado';
+            bool mostrarCamposDeQuestao = _tipoSelecionado == 'Questões' || 
+                                          _tipoSelecionado == 'Teoria e Questões' || 
+                                          _tipoSelecionado == 'Simulado';
 
             return Padding(
               padding: EdgeInsets.only(
@@ -195,8 +200,9 @@ class _TelaCronometroState extends State<TelaCronometro> {
                       ),
                       const SizedBox(height: 24),
 
-                      // --- AUTOCOMPLETE: MATÉRIA ---
                       Autocomplete<String>(
+                        // CODE REVIEW: initialValue adicionado para recuperar o texto se fechar/abrir
+                        initialValue: TextEditingValue(text: _materiaController.text),
                         optionsBuilder: (TextEditingValue textEditingValue) {
                           if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
                           return listaMaterias.where((String option) {
@@ -264,8 +270,9 @@ class _TelaCronometroState extends State<TelaCronometro> {
 
                       const SizedBox(height: 16),
 
-                      // --- NOVO AUTOCOMPLETE: ASSUNTO ---
                       Autocomplete<String>(
+                        // CODE REVIEW: initialValue adicionado para recuperar o texto
+                        initialValue: TextEditingValue(text: _assuntoController.text),
                         optionsBuilder: (TextEditingValue textEditingValue) {
                           if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
                           return listaAssuntos.where((String option) {
@@ -332,7 +339,7 @@ class _TelaCronometroState extends State<TelaCronometro> {
                       const SizedBox(height: 16),
 
                       DropdownButtonFormField<String>(
-                        value: tipoSelecionado,
+                        value: _tipoSelecionado, // CODE REVIEW: Usa a variável da classe
                         dropdownColor: const Color(0xFF2D2D2D),
                         validator: (value) => (value == null || value.isEmpty) ? 'Selecione um tipo de estudo.' : null,
                         decoration: InputDecoration(
@@ -348,7 +355,7 @@ class _TelaCronometroState extends State<TelaCronometro> {
                         }).toList(),
                         onChanged: (String? novoValor) {
                           setModalState(() {
-                            tipoSelecionado = novoValor;
+                            _tipoSelecionado = novoValor;
                             if (!mostrarCamposDeQuestao) {
                               _totalQuestoesController.clear();
                               _acertosController.clear();
@@ -366,12 +373,20 @@ class _TelaCronometroState extends State<TelaCronometro> {
                               child: TextFormField(
                                 controller: _totalQuestoesController,
                                 keyboardType: TextInputType.number,
+                                validator: (value) {
+                                  if (value == null || value.isEmpty) return 'Obrigatório';
+                                  int? val = int.tryParse(value);
+                                  if (val == null || val <= 0) return 'Deve ser > 0'; // CODE REVIEW: Impede 0 questões
+                                  return null;
+                                },
                                 decoration: InputDecoration(
                                   labelText: 'Total de Questões',
                                   labelStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
                                   filled: true,
                                   fillColor: const Color(0xFF0F0F0F),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                                  errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+                                  errorStyle: const TextStyle(fontSize: 10),
                                 ),
                                 style: const TextStyle(color: Colors.white),
                               ),
@@ -382,11 +397,11 @@ class _TelaCronometroState extends State<TelaCronometro> {
                                 controller: _acertosController,
                                 keyboardType: TextInputType.number,
                                 validator: (value) {
-                                  if (value != null && value.isNotEmpty && _totalQuestoesController.text.isNotEmpty) {
-                                    int? acertos = int.tryParse(value);
-                                    int? total = int.tryParse(_totalQuestoesController.text);
-                                    if (acertos != null && total != null && acertos > total) return 'Acertos > Total';
-                                  }
+                                  if (value == null || value.isEmpty) return 'Obrigatório';
+                                  int? acertos = int.tryParse(value);
+                                  int? total = int.tryParse(_totalQuestoesController.text);
+                                  if (acertos == null || acertos < 0) return 'Inválido'; // CODE REVIEW: Impede acertos negativos
+                                  if (total != null && acertos > total) return 'Acertos > Total';
                                   return null;
                                 },
                                 decoration: InputDecoration(
@@ -427,7 +442,7 @@ class _TelaCronometroState extends State<TelaCronometro> {
                             final novaSessao = SessaoEstudo(
                               materia: _materiaController.text,
                               assunto: _assuntoController.text,
-                              tipoEstudo: tipoSelecionado!,
+                              tipoEstudo: _tipoSelecionado!,
                               observacoes: _observacoesController.text,
                               duracaoSegundos: _segundosExibicao, 
                               data: DateTime.now(),

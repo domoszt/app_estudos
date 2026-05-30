@@ -169,7 +169,10 @@ class _TelaBaseState extends State<TelaBase> {
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      // CODE REVIEW: Limpeza de memória garantida ao fechar o pop-up
+      codigoController.dispose();
+    });
   }
 
   // ===========================================================================
@@ -225,10 +228,9 @@ class _TelaBaseState extends State<TelaBase> {
   }
 
   // ===========================================================================
-  // ADICIONAR MANUALMENTE (AGORA COM AUTOCOMPLETE)
+  // ADICIONAR MANUALMENTE
   // ===========================================================================
   void _abrirPainelAdicionarManual() async {
-    // --- LÊ O HISTÓRICO ANTES DE ABRIR O MODAL ---
     final prefs = await SharedPreferences.getInstance();
     List<String> dados = prefs.getStringList('sessoes_estudo') ?? [];
     
@@ -414,7 +416,6 @@ class _TelaBaseState extends State<TelaBase> {
                       Divider(color: Colors.grey.shade800),
                       const SizedBox(height: 16),
 
-                      // --- AUTOCOMPLETE: MATÉRIA ---
                       Autocomplete<String>(
                         optionsBuilder: (TextEditingValue textEditingValue) {
                           if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
@@ -483,7 +484,6 @@ class _TelaBaseState extends State<TelaBase> {
 
                       const SizedBox(height: 16),
 
-                      // --- AUTOCOMPLETE: ASSUNTO ---
                       Autocomplete<String>(
                         optionsBuilder: (TextEditingValue textEditingValue) {
                           if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
@@ -633,9 +633,20 @@ class _TelaBaseState extends State<TelaBase> {
                               duracaoSegundosFinal = 0;
                             }
 
+                            // CODE REVIEW: Bloqueio contra sessões inválidas (0 segundos)
+                            if (modoTempo != 'Sem tempo (Só questões)' && duracaoSegundosFinal <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Insira um tempo válido ou escolha "Sem tempo".', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  backgroundColor: Color(0xFFE57373),
+                                ),
+                              );
+                              return; // Interrompe o processo de salvar
+                            }
+
                             final novaSessao = SessaoEstudo(
-                              materia: materiaController.text, // Usa o valor do Autocomplete
-                              assunto: assuntoController.text, // Usa o valor do Autocomplete
+                              materia: materiaController.text,
+                              assunto: assuntoController.text, 
                               tipoEstudo: tipoSelecionado!,
                               observacoes: obsController.text,
                               duracaoSegundos: duracaoSegundosFinal,
@@ -680,7 +691,16 @@ class _TelaBaseState extends State<TelaBase> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      // CODE REVIEW: Limpeza de memória garantida ao fechar o modal
+      materiaController.dispose();
+      assuntoController.dispose();
+      obsController.dispose();
+      totalQuestoesController.dispose();
+      acertosController.dispose();
+      horasController.dispose();
+      minutosController.dispose();
+    });
   }
 
   @override
@@ -733,7 +753,7 @@ class _TelaBaseState extends State<TelaBase> {
               subtitle: const Text('Inserir sessão passada', style: TextStyle(color: Colors.grey, fontSize: 12)),
               onTap: () {
                 Navigator.pop(context); 
-                _abrirPainelAdicionarManual(); // Agora usa a função atualizada
+                _abrirPainelAdicionarManual();
               },
             ),
             

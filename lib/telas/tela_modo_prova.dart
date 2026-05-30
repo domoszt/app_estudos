@@ -169,7 +169,6 @@ class _TelaModoProvaState extends State<TelaModoProva> {
                   ),
                   const SizedBox(height: 32),
 
-                  // --- AUTOCOMPLETE: MATÉRIA (NOME DO SIMULADO) ---
                   Autocomplete<String>(
                     optionsBuilder: (TextEditingValue textEditingValue) {
                       if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
@@ -236,7 +235,6 @@ class _TelaModoProvaState extends State<TelaModoProva> {
 
                   const SizedBox(height: 16),
 
-                  // --- AUTOCOMPLETE: ASSUNTO ---
                   Autocomplete<String>(
                     optionsBuilder: (TextEditingValue textEditingValue) {
                       if (textEditingValue.text.isEmpty) return const Iterable<String>.empty();
@@ -310,8 +308,19 @@ class _TelaModoProvaState extends State<TelaModoProva> {
                         child: TextFormField(
                           controller: totalQuestoesController,
                           keyboardType: TextInputType.number,
-                          validator: (value) => (value == null || value.isEmpty) ? 'Obrigatório' : null,
-                          decoration: InputDecoration(labelText: 'Total Questões *', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) return 'Obrigatório';
+                            int? val = int.tryParse(value);
+                            if (val == null || val <= 0) return 'Deve ser > 0'; // CODE REVIEW: Trava contra zero/negativo
+                            return null;
+                          },
+                          decoration: InputDecoration(
+                            labelText: 'Total Questões *', 
+                            filled: true, 
+                            fillColor: const Color(0xFF0F0F0F), 
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+                          ),
                           style: const TextStyle(color: Colors.white),
                         ),
                       ),
@@ -324,10 +333,17 @@ class _TelaModoProvaState extends State<TelaModoProva> {
                             if (value == null || value.isEmpty) return 'Obrigatório';
                             int? acertos = int.tryParse(value);
                             int? total = int.tryParse(totalQuestoesController.text);
-                            if (acertos != null && total != null && acertos > total) return 'Acertos > Total';
+                            if (acertos == null || acertos < 0) return 'Inválido'; // CODE REVIEW: Trava contra negativos
+                            if (total != null && acertos > total) return 'Acertos > Total';
                             return null;
                           },
-                          decoration: InputDecoration(labelText: 'Acertos *', filled: true, fillColor: const Color(0xFF0F0F0F), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
+                          decoration: InputDecoration(
+                            labelText: 'Acertos *', 
+                            filled: true, 
+                            fillColor: const Color(0xFF0F0F0F), 
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.redAccent, width: 1)),
+                          ),
                           style: const TextStyle(color: Colors.white),
                         ),
                       ),
@@ -391,7 +407,14 @@ class _TelaModoProvaState extends State<TelaModoProva> {
           ),
         );
       },
-    );
+    ).whenComplete(() {
+      // CODE REVIEW: Limpeza de memória ativada!
+      materiaController.dispose();
+      assuntoController.dispose();
+      totalQuestoesController.dispose();
+      acertosController.dispose();
+      obsController.dispose();
+    });
   }
 
   String _formatarTempo(int segundosTotais) {

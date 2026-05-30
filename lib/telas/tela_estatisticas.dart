@@ -2,7 +2,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../modelos/sessao_estudo.dart';
-import '../utilidades/gerador_cores.dart'; // O NOSSO MOTOR DE CORES AQUI
+import '../utilidades/gerador_cores.dart'; 
 
 class TelaEstatisticas extends StatefulWidget {
   final List<SessaoEstudo> todasSessoes;
@@ -17,22 +17,31 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
   bool _modoQuestoes = false; 
   bool _ordemMaiorAcerto = true; 
 
-  @override
-  Widget build(BuildContext context) {
-    Map<String, int> tempoPorMateria = {};
-    int tempoTotalSegundos = 0;
+  // CODE REVIEW: Variáveis pré-calculadas guardadas no estado da tela
+  int _tempoTotalSegundos = 0;
+  int _totalQuestoesGeral = 0;
+  int _totalAcertosGeral = 0;
+  List<MapEntry<String, int>> _materiasOrdenadasTempo = [];
+  List<Map<String, dynamic>> _listaDesempenhoQuestoes = [];
 
-    int totalQuestoesGeral = 0;
-    int totalAcertosGeral = 0;
+  @override
+  void initState() {
+    super.initState();
+    _processarEstatisticas(); // Chama a matemática pesada APENAS UMA VEZ
+  }
+
+  // CODE REVIEW: Toda a lógica retirada do 'build' e isolada aqui
+  void _processarEstatisticas() {
+    Map<String, int> tempoPorMateria = {};
     Map<String, Map<String, int>> statsMateria = {};
 
     for (var sessao in widget.todasSessoes) {
       tempoPorMateria[sessao.materia] = (tempoPorMateria[sessao.materia] ?? 0) + sessao.duracaoSegundos;
-      tempoTotalSegundos += sessao.duracaoSegundos;
+      _tempoTotalSegundos += sessao.duracaoSegundos;
 
       if (sessao.totalQuestoes != null && sessao.acertos != null && sessao.totalQuestoes! > 0) {
-        totalQuestoesGeral += sessao.totalQuestoes!;
-        totalAcertosGeral += sessao.acertos!;
+        _totalQuestoesGeral += sessao.totalQuestoes!;
+        _totalAcertosGeral += sessao.acertos!;
 
         if (!statsMateria.containsKey(sessao.materia)) {
           statsMateria[sessao.materia] = {'questoes': 0, 'acertos': 0};
@@ -42,13 +51,12 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
       }
     }
 
-    var materiasOrdenadasTempo = tempoPorMateria.entries.toList()
+    _materiasOrdenadasTempo = tempoPorMateria.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    List<Map<String, dynamic>> listaDesempenhoQuestoes = [];
     statsMateria.forEach((materia, dados) {
       double percentual = (dados['acertos']! / dados['questoes']!) * 100;
-      listaDesempenhoQuestoes.add({
+      _listaDesempenhoQuestoes.add({
         'materia': materia,
         'questoes': dados['questoes'],
         'acertos': dados['acertos'],
@@ -56,14 +64,21 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
       });
     });
 
-    listaDesempenhoQuestoes.sort((a, b) {
+    _ordenarListaQuestoes();
+  }
+
+  void _ordenarListaQuestoes() {
+    _listaDesempenhoQuestoes.sort((a, b) {
       if (_ordemMaiorAcerto) {
         return b['percentual'].compareTo(a['percentual']); 
       } else {
         return a['percentual'].compareTo(b['percentual']); 
       }
     });
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -85,9 +100,10 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
                     transitionBuilder: (Widget child, Animation<double> animation) {
                       return FadeTransition(opacity: animation, child: child);
                     },
+                    // CODE REVIEW: Usando as variáveis que já estão prontas
                     child: _modoQuestoes 
-                        ? _construirVisaoQuestoes(totalQuestoesGeral, totalAcertosGeral, listaDesempenhoQuestoes)
-                        : _construirVisaoTempo(materiasOrdenadasTempo, tempoTotalSegundos),
+                        ? _construirVisaoQuestoes(_totalQuestoesGeral, _totalAcertosGeral, _listaDesempenhoQuestoes)
+                        : _construirVisaoTempo(_materiasOrdenadasTempo, _tempoTotalSegundos),
                   ),
           ),
           
@@ -128,7 +144,6 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
   }
 
   Widget _construirVisaoTempo(List<MapEntry<String, int>> materiasOrdenadas, int tempoTotalSegundos) {
-    // Aqui geramos a lista de cores e valores na ordem exata puxando do nosso GeradorCores!
     List<double> valoresPizza = [];
     List<Color> coresPizza = [];
     
@@ -180,7 +195,7 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
                 const Text('Mais Estudadas', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
                 const SizedBox(height: 16),
                 ...List.generate(
-                  materiasOrdenadas.length, // Mostra todas as matérias agora, em vez de só 5!
+                  materiasOrdenadas.length,
                   (index) {
                     final item = materiasOrdenadas[index];
                     final cor = GeradorCores.obterCor(item.key);
@@ -280,6 +295,7 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
                       onPressed: () {
                         setState(() {
                           _ordemMaiorAcerto = !_ordemMaiorAcerto;
+                          _ordenarListaQuestoes(); // CODE REVIEW: Re-ordena apenas quando clica
                         });
                       },
                       icon: Icon(
@@ -300,10 +316,7 @@ class _TelaEstatisticasState extends State<TelaEstatisticas> {
                 ...listaDesempenho.map((item) {
                   double perc = item['percentual'];
                   
-                  // A cor do semáforo indica o desempenho (para a barra)
                   Color corBarra = perc >= 70 ? const Color(0xFF81C784) : (perc >= 50 ? const Color(0xFFFF9900) : const Color(0xFFE57373));
-                  
-                  // A cor oficial da matéria indica a identidade visual (para o texto)
                   Color corMateria = GeradorCores.obterCor(item['materia']);
                   
                   return Padding(
