@@ -99,6 +99,8 @@ class _TelaHistoricoState extends State<TelaHistorico> {
       diaChecagem = diaChecagem.subtract(const Duration(days: 1));
     }
 
+  if (!mounted) return;
+
     setState(() {
       _diasOfensiva = contagem;
       _carregando = false;

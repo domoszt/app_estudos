@@ -7,7 +7,7 @@ import 'tela_cronometro.dart';
 import 'tela_historico.dart';
 import 'tela_desempenho.dart';
 import 'tela_modo_prova.dart';
-import 'painel_adicionar_manual.dart'; // Importação do novo widget!
+import 'painel_adicionar_manual.dart'; 
 
 class TelaBase extends StatefulWidget {
   const TelaBase({super.key});
@@ -18,8 +18,24 @@ class TelaBase extends StatefulWidget {
 
 class _TelaBaseState extends State<TelaBase> {
   int _indiceAtual = 0;
-  
   Key _chaveAbas = UniqueKey();
+  
+  // O NOVO MOTOR: Controlador das páginas deslizantes
+  late PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Inicia o controlador na página zero (Cronómetro)
+    _pageController = PageController(initialPage: _indiceAtual);
+  }
+
+  @override
+  void dispose() {
+    // Destrói o controlador para poupar memória quando a app fechar
+    _pageController.dispose();
+    super.dispose();
+  }
 
   void _atualizarDados() {
     setState(() {
@@ -251,7 +267,7 @@ class _TelaBaseState extends State<TelaBase> {
       backgroundColor: const Color(0xFF1C1C1C),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (BuildContext context) {
-        return PainelAdicionarManual( // Chamada ao widget isolado
+        return PainelAdicionarManual(
           listaMaterias: listaMaterias,
           listaAssuntos: listaAssuntos,
           aoSalvar: _atualizarDados,
@@ -391,16 +407,22 @@ class _TelaBaseState extends State<TelaBase> {
         ),
         centerTitle: true,
       ),
-      body: Stack(
+      // =======================================================================
+      // MOTOR SUBSTITUÍDO: PAGEVIEW EM VEZ DE STACK
+      // =======================================================================
+      body: PageView(
+        controller: _pageController,
+        physics: const BouncingScrollPhysics(), // Efeito de mola ao bater no fim
+        onPageChanged: (index) {
+          // Quando o utilizador desliza o dedo, a barra lá em baixo atualiza
+          setState(() {
+            _indiceAtual = index;
+          });
+        },
         children: [
-          Offstage(
-            offstage: _indiceAtual != 0,
-            child: const TelaCronometro(),
-          ),
-          if (_indiceAtual == 1) 
-            TelaHistorico(key: _chaveAbas), 
-          if (_indiceAtual == 2)
-            TelaDesempenho(key: _chaveAbas), 
+          const TelaCronometro(),
+          TelaHistorico(key: _chaveAbas),
+          TelaDesempenho(key: _chaveAbas),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -411,9 +433,15 @@ class _TelaBaseState extends State<TelaBase> {
         showSelectedLabels: true,
         showUnselectedLabels: false,
         onTap: (index) {
+          // Quando clica num ícone lá em baixo, o ecrã desliza até lá
           setState(() {
             _indiceAtual = index;
           });
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
         },
         items: const [
           BottomNavigationBarItem(
