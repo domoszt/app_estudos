@@ -7,7 +7,9 @@ import 'tela_cronometro.dart';
 import 'tela_historico.dart';
 import 'tela_desempenho.dart';
 import 'tela_modo_prova.dart';
-import 'painel_adicionar_manual.dart'; 
+import 'painel_adicionar_manual.dart';
+import 'tela_revisoes.dart';
+import '../modelos/sessao_estudo.dart';
 
 class TelaBase extends StatefulWidget {
   const TelaBase({super.key});
@@ -37,10 +39,8 @@ class _TelaBaseState extends State<TelaBase> {
     super.dispose();
   }
 
-  void _atualizarDados() {
-    setState(() {
-      _chaveAbas = UniqueKey();
-    });
+void _atualizarDados() {
+    notificadorVanguard.value++; // Dispara o aviso para todas as abas!
   }
 
   // ===========================================================================
@@ -282,7 +282,9 @@ class _TelaBaseState extends State<TelaBase> {
     if (_indiceAtual == 0) {
       tituloAppBar = 'Foco';
     } else if (_indiceAtual == 1) {
-      tituloAppBar = 'Meu Histórico';
+      tituloAppBar = 'Histórico';
+    } else if (_indiceAtual == 2) {
+      tituloAppBar = 'Revisão'; // <--- NOSSO NOVO TÍTULO AQUI!
     } else {
       tituloAppBar = 'Desempenho'; 
     }
@@ -410,22 +412,23 @@ class _TelaBaseState extends State<TelaBase> {
       // =======================================================================
       // MOTOR SUBSTITUÍDO: PAGEVIEW EM VEZ DE STACK
       // =======================================================================
-      body: PageView(
+body: PageView(
         controller: _pageController,
-        physics: const BouncingScrollPhysics(), // Efeito de mola ao bater no fim
+        physics: const BouncingScrollPhysics(),
         onPageChanged: (index) {
-          // Quando o utilizador desliza o dedo, a barra lá em baixo atualiza
           setState(() {
             _indiceAtual = index;
           });
         },
-        children: [
-          const TelaCronometro(),
-          TelaHistorico(key: _chaveAbas),
-          TelaDesempenho(key: _chaveAbas),
+        children: const [ // Coloque este 'const' aqui!
+          TelaCronometro(),
+          TelaHistorico(),
+          TelaRevisoes(),
+          TelaDesempenho(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
         backgroundColor: const Color(0xFF1C1C1C),
         currentIndex: _indiceAtual,
         selectedItemColor: const Color(0xFF4DA6FF),
@@ -451,6 +454,10 @@ class _TelaBaseState extends State<TelaBase> {
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_month_rounded),
             label: 'Histórico',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.fact_check_rounded), // ÍCONE DE REVISÕES
+            label: 'Revisões',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.query_stats_rounded),

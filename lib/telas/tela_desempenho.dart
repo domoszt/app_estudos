@@ -12,9 +12,12 @@ class TelaDesempenho extends StatefulWidget {
   State<TelaDesempenho> createState() => _TelaDesempenhoState();
 }
 
-class _TelaDesempenhoState extends State<TelaDesempenho> {
-  bool _carregando = true;
+class _TelaDesempenhoState extends State<TelaDesempenho> with AutomaticKeepAliveClientMixin {
   
+  @override
+  bool get wantKeepAlive => true; // O escudo que evita o engasgo
+
+  bool _carregando = true;
   bool _mostrarGraficoBarras = true;
   bool _verAssuntos = false; 
   bool _pioresPrimeiro = true; 
@@ -33,6 +36,13 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
   void initState() {
     super.initState();
     _processarDadosDeQuestoes();
+    notificadorVanguard.addListener(_processarDadosDeQuestoes); // Liga o rádio
+  }
+
+  @override
+  void dispose() {
+    notificadorVanguard.removeListener(_processarDadosDeQuestoes); // Desliga o rádio
+    super.dispose();
   }
 
   DateTime _zerarHorario(DateTime data) {
@@ -488,10 +498,12 @@ class _TelaDesempenhoState extends State<TelaDesempenho> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // TEM DE TER ESTA LINHA AQUI!
+
     if (_carregando) {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF4DA6FF)));
     }
-
+    
     double aproveitamentoSemana = _totalSemana > 0 ? (_acertosSemana / _totalSemana) * 100 : 0;
     Color corAproveitamento = aproveitamentoSemana >= 70 ? const Color(0xFF81C784) : (aproveitamentoSemana >= 50 ? const Color(0xFFFF9900) : const Color(0xFFE57373));
 

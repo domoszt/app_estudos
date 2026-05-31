@@ -1,4 +1,9 @@
 // lib/modelos/sessao_estudo.dart
+
+import 'package:flutter/foundation.dart';
+
+final ValueNotifier<int> notificadorVanguard = ValueNotifier(0);
+
 class SessaoEstudo {
   final String materia;
   final String assunto;
@@ -10,6 +15,11 @@ class SessaoEstudo {
   final int? totalQuestoes;
   final int? acertos;
 
+  // Novos sensores de revisão tática
+  final bool rev24h;
+  final bool rev7d;
+  final bool rev30d;
+
   SessaoEstudo({
     required this.materia,
     required this.assunto,
@@ -19,6 +29,9 @@ class SessaoEstudo {
     required this.data,
     this.totalQuestoes,
     this.acertos,
+    this.rev24h = false, 
+    this.rev7d = false,
+    this.rev30d = false,
   });
 
   Map<String, dynamic> toJson() => {
@@ -30,9 +43,11 @@ class SessaoEstudo {
         'data': data.toIso8601String(),
         'totalQuestoes': totalQuestoes,
         'acertos': acertos,
+        'rev24h': rev24h,
+        'rev7d': rev7d,
+        'rev30d': rev30d,
       };
 
-  // REFATORAÇÃO: Proteção contra valores nulos (Fallbacks)
   factory SessaoEstudo.fromJson(Map<String, dynamic> json) => SessaoEstudo(
         materia: json['materia'] ?? '',
         assunto: json['assunto'] ?? '',
@@ -42,5 +57,8 @@ class SessaoEstudo {
         data: json['data'] != null ? DateTime.parse(json['data']) : DateTime.now(),
         totalQuestoes: json['totalQuestoes'],
         acertos: json['acertos'],
+        rev24h: json['rev24h'] ?? false,
+        rev7d: json['rev7d'] ?? false,
+        rev30d: json['rev30d'] ?? false,
       );
 }
