@@ -20,7 +20,6 @@ class TelaBase extends StatefulWidget {
 
 class _TelaBaseState extends State<TelaBase> {
   int _indiceAtual = 0;
-  Key _chaveAbas = UniqueKey();
   
   // O NOVO MOTOR: Controlador das páginas deslizantes
   late PageController _pageController;
@@ -39,8 +38,116 @@ class _TelaBaseState extends State<TelaBase> {
     super.dispose();
   }
 
-void _atualizarDados() {
+  void _atualizarDados() {
     notificadorVanguard.value++; // Dispara o aviso para todas as abas!
+  }
+
+// ===========================================================================
+  // CONFIGURAÇÃO DA META DIÁRIA (COM VALIDAÇÃO)
+  // ===========================================================================
+  void _abrirConfiguracaoMeta() async {
+    final prefs = await SharedPreferences.getInstance();
+    int metaAtual = prefs.getInt('meta_diaria_segundos') ?? 0;
+    
+    // Desmontar os segundos em horas e minutos para preencher as caixas
+    int hAtual = metaAtual ~/ 3600;
+    int mAtual = (metaAtual % 3600) ~/ 60;
+    
+    final TextEditingController horasController = TextEditingController(
+      text: hAtual > 0 ? hAtual.toString() : ''
+    );
+    final TextEditingController minutosController = TextEditingController(
+      text: mAtual > 0 ? mAtual.toString() : ''
+    );
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C1C1C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Meta Diária de Estudos', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Defina o tempo que pretende estudar hoje:', style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: horasController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Horas',
+                      labelStyle: TextStyle(color: Colors.grey.shade600),
+                      filled: true,
+                      fillColor: const Color(0xFF0F0F0F),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextField(
+                    controller: minutosController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Minutos',
+                      labelStyle: TextStyle(color: Colors.grey.shade600),
+                      filled: true,
+                      fillColor: const Color(0xFF0F0F0F),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // Botão Remover: Zera a meta e fecha o painel
+              await prefs.setInt('meta_diaria_segundos', 0);
+              if (mounted) Navigator.pop(context);
+              _atualizarDados();
+            },
+            child: const Text('Remover', style: TextStyle(color: Colors.redAccent)),
+          ),
+          TextButton(
+            onPressed: () async {
+              // Bloqueador: Captura o que o utilizador digitou
+              int h = int.tryParse(horasController.text) ?? 0;
+              int m = int.tryParse(minutosController.text) ?? 0;
+              
+              int totalSegundos = (h * 3600) + (m * 60);
+
+              // Validação: Se tentar meter 0 ou negativo, a barricada é ativada!
+              if (totalSegundos <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('A meta deve ser superior a zero! Para apagar, use o botão Remover.', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    backgroundColor: Colors.redAccent,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return; // Impede que o painel feche e não guarda nada
+              }
+
+              // Se passou na segurança, guarda e atualiza
+              await prefs.setInt('meta_diaria_segundos', totalSegundos);
+              if (mounted) Navigator.pop(context);
+              _atualizarDados();
+            },
+            child: const Text('Salvar', style: TextStyle(color: Color(0xFF4DA6FF), fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   // ===========================================================================
@@ -265,7 +372,7 @@ void _atualizarDados() {
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF1C1C1C),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       builder: (BuildContext context) {
         return PainelAdicionarManual(
           listaMaterias: listaMaterias,
@@ -284,7 +391,7 @@ void _atualizarDados() {
     } else if (_indiceAtual == 1) {
       tituloAppBar = 'Histórico';
     } else if (_indiceAtual == 2) {
-      tituloAppBar = 'Revisão'; // <--- NOSSO NOVO TÍTULO AQUI!
+      tituloAppBar = 'Revisão'; 
     } else {
       tituloAppBar = 'Desempenho'; 
     }
@@ -332,6 +439,20 @@ void _atualizarDados() {
               ),
             ),
             const SizedBox(height: 8),
+
+            // ==================================================
+            // NOVO BOTÃO DA META DIÁRIA COLOCADO AQUI:
+            // ==================================================
+            ListTile(
+              leading: const Icon(Icons.track_changes_rounded, color: Color(0xFF4DA6FF)),
+              title: const Text('Definir Meta Diária', style: TextStyle(color: Colors.white, fontSize: 16)),
+              subtitle: const Text('Ativar radar de progresso', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              onTap: () {
+                Navigator.pop(context); 
+                _abrirConfiguracaoMeta();
+              },
+            ),
+
             ListTile(
               leading: const Icon(Icons.add_task_rounded, color: Colors.white),
               title: const Text('Adicionar registo manual', style: TextStyle(color: Colors.white, fontSize: 16)),
@@ -409,10 +530,7 @@ void _atualizarDados() {
         ),
         centerTitle: true,
       ),
-      // =======================================================================
-      // MOTOR SUBSTITUÍDO: PAGEVIEW EM VEZ DE STACK
-      // =======================================================================
-body: PageView(
+      body: PageView(
         controller: _pageController,
         physics: const BouncingScrollPhysics(),
         onPageChanged: (index) {
@@ -420,7 +538,7 @@ body: PageView(
             _indiceAtual = index;
           });
         },
-        children: const [ // Coloque este 'const' aqui!
+        children: const [
           TelaCronometro(),
           TelaHistorico(),
           TelaRevisoes(),
@@ -436,7 +554,6 @@ body: PageView(
         showSelectedLabels: true,
         showUnselectedLabels: false,
         onTap: (index) {
-          // Quando clica num ícone lá em baixo, o ecrã desliza até lá
           setState(() {
             _indiceAtual = index;
           });
@@ -456,7 +573,7 @@ body: PageView(
             label: 'Histórico',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.fact_check_rounded), // ÍCONE DE REVISÕES
+            icon: Icon(Icons.fact_check_rounded), 
             label: 'Revisões',
           ),
           BottomNavigationBarItem(

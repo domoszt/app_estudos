@@ -269,9 +269,6 @@ class _TelaHistoricoState extends State<TelaHistorico> with AutomaticKeepAliveCl
       if (s.assunto.trim().isNotEmpty) assuntosUnicos.add(s.assunto.trim());
     }
     
-    List<String> listaMaterias = materiasUnicas.toList()..sort();
-    List<String> listaAssuntos = assuntosUnicos.toList()..sort();
-
     final formKey = GlobalKey<FormState>();
     final materiaController = TextEditingController(text: sessaoOriginal.materia);
     final assuntoController = TextEditingController(text: sessaoOriginal.assunto);
